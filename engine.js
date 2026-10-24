@@ -120,14 +120,14 @@
       if (p.leader === 'L08') return p.statues.filter(s => !s.up).length >= 5;
       if (p.leader === 'L10') { const c = { F: 0, W: 0, G: 0 }; up.forEach(s => c[s.id[0]]++); return c.F >= 2 && c.W >= 2 && c.G >= 2; }
       if (p.leader === 'L11') return up.filter(s => s.id[0] === p.main).length >= 4;
-      if (p.leader === 'L13') return o.statues.filter(s => s.up && s.byL13).length >= 3;
+      if (p.leader === 'L13') return o.statues.filter(s => s.up && s.byL13).length >= 4;
       return false;
     }
     checkAlt() {
       if (this.winner !== null) return true;
       const a = [this.altWin(0), this.altWin(1)];
       if (a[0] && a[1]) { if (!this.sudden) { this.sudden = true; this.note('雙方同時達成勝利條件，進入搶 1 分加賽'); } return false; }
-      if (a[0] || a[1]) { this.winner = a[0] ? 0 : 1; this.how = 'leader'; return true; }
+      if (a[0] || a[1]) { this.winner = a[0] ? 0 : 1; this.how = 'leader'; if (this._onWin) this._onWin(); return true; }
       return false;
     }
 
@@ -186,21 +186,30 @@
         }
         const peeks = (this.lead(p, 'L07') ? 1 : 0) + this.count(p, 'W06');
         if (peeks && o.hand.length) await this.peek(i, 2);
-        // L13 重新指定封印
-        o.statues.forEach(s => { if (s.byL13) { s.byL13 = false; s.sealed = false; } });
-        p.statues.forEach(s => s.maint = false);
-        if (this.lead(p, 'L13')) {
-          const c = {}; this.upright(p).forEach(s => (c[s.id[0]] = c[s.id[0]] || []).push(s));
-          let slots = 0; Object.values(c).forEach(a => slots += Math.floor(a.length / 2));
-          const tg = o.statues.filter(s => s.up && !s.sealed).sort((a, b) => (STATIC_VAL[b.id] || .3) - (STATIC_VAL[a.id] || .3));
-          let n = Math.min(slots, tg.length);
-          tg.slice(0, n).forEach(s => { s.sealed = true; s.byL13 = true; });
-          for (const col in c) { const pairs = Math.min(Math.floor(c[col].length / 2), n); c[col].slice(0, pairs * 2).forEach(s => s.maint = true); n -= pairs; }
-          const sealedN = o.statues.filter(s => s.byL13).length;
-          if (sealedN) { this.note(`雙界封印：封印對手 ${sealedN} 座石像`, i); await this.ui.ev('seal', { i }); }
-        }
       }
       this.checkAlt();
+    }
+    // L13：整理階段重新指定封印（維持到下一次整理）
+    async l13Cleanup() {
+      for (const i of [this.first, 1 - this.first]) {
+        const p = this.p[i], o = this.opp(i);
+        if (p.leader !== 'L13') continue;
+        o.statues.forEach(s => { if (s.byL13) { s.byL13 = false; s.sealed = false; } });
+        p.statues.forEach(s => s.maint = false);
+        if (!this.lead(p, 'L13')) continue;
+        const c = {}; this.upright(p).forEach(s => (c[s.id[0]] = c[s.id[0]] || []).push(s));
+        let slots = 0; Object.values(c).forEach(a => slots += Math.floor(a.length / 2));
+        const tg = o.statues.filter(s => s.up && !s.sealed);
+        let n = Math.min(slots, tg.length);
+        if (!n) continue;
+        const picked = (await this.ctrl[i].pick(this, i, 'l13', { statues: tg, n, title: `雙界封印：選擇 ${n} 座對手石像封印` })) || [];
+        const chosen = [...new Set(picked)].filter(s => tg.includes(s)).slice(0, n);
+        for (const s of tg) if (chosen.length < n && !chosen.includes(s)) chosen.push(s);
+        chosen.forEach(s => { s.sealed = true; s.byL13 = true; });
+        for (const col in c) { const pairs = Math.min(Math.floor(c[col].length / 2), n); c[col].slice(0, pairs * 2).forEach(s => s.maint = true); n -= pairs; }
+        this.note(`雙界封印：封印 ${chosen.map(s => CARDS[s.id].name).join('、')}`, i);
+        await this.ui.ev('seal', { i });
+      }
     }
     async peek(i, n) {
       const o = this.opp(i);
@@ -272,8 +281,16 @@
     }
 
     // ---------- 獻祭 ----------
-    async sacrifice(i, st, phase) {
+    // 同一時間只處理一個獻祭（同時出牌期間雙方都可能獻祭）
+    sacrifice(i, st, phase) {
+      const run = () => this._sacrifice(i, st, phase);
+      const job = (this._sacLock || Promise.resolve()).then(run, run);
+      this._sacLock = job.catch(() => {});
+      return job;
+    }
+    async _sacrifice(i, st, phase) {
       const p = this.p[i];
+      if (this.winner !== null) return false;
       if (!this.canSacList(i).includes(st)) return false;
       st.up = false; p.sacUsed = true;
       this.note(`獻祭 ${CARDS[st.id].name}：${CARDS[st.id].sac}`, i);
@@ -375,14 +392,20 @@
       // 出牌（含出牌前獻祭）
       this.phase = 'choose';
       const order = [this.first, 1 - this.first];
-      const choice = [null, null];
-      for (const i of order) {
-        choice[i] = await this.ctrl[i].choose(this, i, 'pre');
-        if (this.winner !== null) return;
-      }
+      // 雙方同時選牌；期間任一方獻祭造成獲勝就直接結束
+      const choice = await Promise.race([
+        Promise.all([0, 1].map(i => this.ctrl[i].choose(this, i, 'pre'))),
+        new Promise(r => { this._onWin = () => r(null); }),
+      ]);
+      this._onWin = null;
+      if (this.winner !== null || !choice) return;
+      await this._sacLock;
       for (const i of [0, 1]) {
-        this.played[i] = choice[i];
-        for (const c of choice[i]) this.p[i].hand.splice(this.p[i].hand.indexOf(c), 1);
+        const hand = this.p[i].hand;
+        let cs = (choice[i] || []).filter(c => hand.includes(c));
+        if (!cs.length) cs = hand.slice(0, 1);
+        this.played[i] = cs;
+        for (const c of cs) hand.splice(hand.indexOf(c), 1);
       }
       this.phase = 'reveal';
       [0, 1].forEach(i => this.setCore(i));
@@ -424,6 +447,8 @@
         await this.ui.ev('summon', { i, statues: newS, rest: cards.filter(c => !sm.includes(c)) });
       }
       this.p.forEach(p => p.statues.forEach(s => { if (s.tmpSeal) { s.tmpSeal = false; s.sealed = false; } }));
+      this.phase = 'end';
+      await this.l13Cleanup();
       // 勝利
       if (this.sudden && ev.w !== null) { this.winner = ev.w; this.how = 'sudden'; return; }
       const sc = this.p.map(p => p.score >= 4);
@@ -546,6 +571,7 @@
           const v = s => (STATIC_VAL[s.id] || .3) * (s.sealed ? 0 : 1) + (opp.leader === 'L11' && s.id[0] === opp.main ? 1.5 : 0) + (opp.leader === 'L10' ? .8 : 0) + (s.maint ? 1.2 : 0) - (['F06', 'G09'].includes(s.id) ? .4 : 0);
           return [o.statues.sort((a, b) => v(b) - v(a))[0]];
         }
+        case 'l13': return o.statues.slice().sort((a, b) => (STATIC_VAL[b.id] || .3) - (STATIC_VAL[a.id] || .3)).slice(0, o.n);
         case 'copy': { const t = AI.copyTarget(g, i, g.phase); return [o.statues.includes(t) ? t : o.statues[0]]; }
         case 'g08': { const b = AI.bestG08(g, i); return b ? { card: b.card, color: b.color } : null; }
       }

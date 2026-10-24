@@ -204,11 +204,14 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .foe-hand .card{--w:58px;margin:0 -8px}
 
 /* 側欄 */
-.detail{position:absolute;left:14px;top:14px;width:222px;display:grid;gap:8px;background:#11151c;border:1px solid var(--line);border-radius:8px;padding:10px;transition:box-shadow .3s}
+.lcol{position:absolute;left:14px;top:14px;width:222px;display:flex;flex-direction:column;gap:8px}
+.effbar{display:grid;grid-template-columns:1fr 1fr;gap:6px}.effbar .btn{padding-left:0;padding-right:0}.effbar .btn b{color:var(--gold-hi);margin-left:2px}
+.effbar .btn[aria-pressed=true]{border-color:var(--gold-hi)}
+.detail{position:relative;display:grid;gap:8px;background:#11151c;border:1px solid var(--line);border-radius:8px;padding:10px;transition:box-shadow .3s}
 .mcards .card:hover{outline:2px solid var(--gold-hi);outline-offset:2px;border-radius:6%}
 .detail.over{z-index:105;box-shadow:0 0 0 1px var(--gold-hi),0 0 30px #f1d49166}
 .detail.focus{box-shadow:0 0 0 1px var(--gold),0 0 24px #c9a45c44}
-.detail .card{--w:170px;justify-self:center}
+.detail .card{--w:148px;justify-self:center}
 .detail .dn{font-family:var(--f-display);font-weight:900;font-size:17px}
 .detail .dm{font-size:12px;color:var(--muted)}
 .detail .row{font-size:13px;line-height:1.55}
@@ -251,6 +254,27 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .vs-hint{margin-top:10px;color:var(--muted);letter-spacing:.1em}
 .netstate{color:var(--gold-hi);font-size:12px;animation:blink 1.2s infinite alternate}
 @keyframes blink{from{opacity:.4}to{opacity:1}}
+.ctag{display:inline-block;padding:0 7px;border-radius:9px;color:#fff;font-weight:700;font-size:12px;line-height:18px}
+.ctag.F{background:var(--fire)}.ctag.W{background:var(--water)}.ctag.G{background:var(--grass)}
+.dlink{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.dlink:hover{color:var(--gold-hi)}
+.zone .card.locked{opacity:.75;filter:saturate(.7)}
+.lockt{position:absolute;bottom:4px;right:12px;font-size:12px;color:var(--gold-hi);letter-spacing:.08em}
+.pw.live{border-style:dashed}.pw.live.lead{border-color:var(--gold-hi)}
+.pw .lv{color:var(--text);font-weight:700}
+.mcards.pile{max-height:56vh;overflow:auto;padding:14px 10px 6px}
+.pcard{position:relative}.pcard .card{--w:96px}
+.pno{position:absolute;top:-9px;left:-6px;z-index:3;min-width:22px;height:22px;border-radius:11px;background:var(--gold-hi);color:#1b1408;font-weight:900;font-size:12px;display:grid;place-items:center;padding:0 4px}
+.effpanel{position:absolute;left:250px;top:70px;width:560px;max-height:560px;overflow:auto;z-index:90;background:#0d1016f5;border:1px solid var(--gold);border-radius:10px;padding:12px 14px;box-shadow:0 20px 50px #000c}
+.effhd{display:flex;justify-content:space-between;align-items:center;font-family:var(--f-display);color:var(--gold-hi);font-size:16px;margin-bottom:8px}
+.effcols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.effcol h4{margin:0 0 6px;font-size:13px;letter-spacing:.2em}.effcol.me h4{color:var(--me)}.effcol.foe h4{color:var(--foe)}
+.effcol.focus{}
+.eff{font-size:12.5px;line-height:1.5;padding:6px 8px;border-radius:6px;background:#161b24;margin-bottom:5px;border-left:3px solid var(--line)}
+.eff b{display:block;font-size:12px;color:var(--gold-hi)}
+.eff em{display:block;font-style:normal;color:#d9c2ff;font-size:11.5px}
+.eff.lead{border-left-color:var(--gold-hi)}.eff.buff{border-left-color:var(--ok)}.eff.debuff{border-left-color:var(--danger)}
+.eff.off{opacity:.55}.eff.info{color:var(--muted)}
 .cheat{position:relative;flex:none;box-sizing:border-box;width:100%;overflow:hidden;background:#11151c;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px}
 .cheat h4{flex-wrap:wrap;gap:0 6px;margin:0 0 4px;font-family:var(--f-display);font-size:13px;color:var(--gold-hi);letter-spacing:.1em;display:flex;justify-content:space-between;align-items:center}
 .cheat h4 small{font-family:var(--f-body);font-weight:400;color:var(--muted);font-size:11px;letter-spacing:0}
@@ -367,7 +391,11 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
         <div class="zone st z-me-st" id="zMeSt"></div>
       </div>
       <div class="foe-hand" id="foeHand"></div>
-      <div class="detail" id="detail"></div>
+      <div class="lcol">
+        <div class="detail" id="detail"></div>
+        <div class="effbar"><button class="btn ghost small" id="effMe">我方效果</button><button class="btn ghost small" id="effFoe">對手效果</button></div>
+      </div>
+      <div class="effpanel" id="effPanel" hidden></div>
       <div class="side foe" id="sideFoe"></div>
       <div class="rcol">
       <div class="turnbox">
