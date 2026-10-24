@@ -207,14 +207,16 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .lcol{position:absolute;left:14px;top:14px;width:222px;display:flex;flex-direction:column;gap:8px}
 .effbar{display:grid;grid-template-columns:1fr 1fr;gap:6px}.effbar .btn{padding-left:0;padding-right:0}.effbar .btn b{color:var(--gold-hi);margin-left:2px}
 .effbar .btn[aria-pressed=true]{border-color:var(--gold-hi)}
-.detail{position:relative;display:grid;gap:8px;background:#11151c;border:1px solid var(--line);border-radius:8px;padding:10px;transition:box-shadow .3s}
+.dslot{position:relative;height:352px;flex:none}
+.detail{position:absolute;left:0;top:0;z-index:40;width:310px;display:grid;gap:8px;background:#11151cf5;border:1px solid var(--gold);border-radius:10px;padding:12px 14px;box-shadow:0 0 0 1px var(--gold-hi),0 12px 40px #000c,0 0 26px #f1d49144;visibility:hidden;opacity:0;transition:opacity .12s}
+.detail.show{visibility:visible;opacity:1}
 .mcards .card:hover{outline:2px solid var(--gold-hi);outline-offset:2px;border-radius:6%}
 .detail.over{z-index:105;box-shadow:0 0 0 1px var(--gold-hi),0 0 30px #f1d49166}
-.detail.focus{box-shadow:0 0 0 1px var(--gold),0 0 24px #c9a45c44}
-.detail .card{--w:148px;justify-self:center}
-.detail .dn{font-family:var(--f-display);font-weight:900;font-size:17px}
-.detail .dm{font-size:12px;color:var(--muted)}
-.detail .row{font-size:13px;line-height:1.55}
+.detail.focus{}
+.detail .card{--w:176px;justify-self:center}
+.detail .dn{font-family:var(--f-display);font-weight:900;font-size:22px}
+.detail .dm{font-size:13px;color:var(--muted)}
+.detail .row{font-size:17px;line-height:1.55}
 .detail .row b{display:inline-block;color:var(--gold-hi);margin-right:6px}
 .detail .hint{font-size:12px;color:var(--muted);line-height:1.6}
 .side{position:absolute;right:14px;width:216px;display:grid;gap:8px}
@@ -412,7 +414,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
       </div>
       <div class="foe-hand" id="foeHand"></div>
       <div class="lcol">
-        <div class="detail" id="detail"></div>
+        <div class="dslot"><div class="detail" id="detail"></div></div>
         <div class="effbar"><button class="btn ghost small" id="effMe">啟動效果</button><button class="btn ghost small" id="effFoe">獻祭效果</button></div>
       </div>
       <div class="effpanel" id="effPanel" hidden></div>

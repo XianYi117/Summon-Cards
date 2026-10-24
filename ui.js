@@ -249,11 +249,13 @@
       t.style.left = x + 'px'; t.style.top = y + 'px'; t.hidden = false;
       clearTimeout(tipTimer); clearTimeout(focusOff); tipTimer = setTimeout(() => showDetail(id, true), 150);
     });
-    c.addEventListener('pointerleave', () => { $('#tip').hidden = true; clearTimeout(tipTimer); clearTimeout(focusOff); focusOff = setTimeout(() => $('#detail').classList.remove('focus'), 500); });
+    c.addEventListener('pointerleave', () => { $('#tip').hidden = true; clearTimeout(tipTimer); clearTimeout(focusOff); focusOff = setTimeout(hideDetail, 500); });
   }
+  function hideDetail() { $('#detail').classList.remove('show', 'focus', 'over'); }
   function showDetail(id, focus) {
     const d = $('#detail'); d.innerHTML = '';
-    if (!id) { d.appendChild(el('div', 'hint', '把滑鼠停在任何卡上，這裡會顯示完整說明。')); return; }
+    if (!id) { hideDetail(); return; }
+    d.classList.add('show');
     const x = info(id); d.appendChild(cardEl(id));
     d.appendChild(el('div', 'dn', `${x.name}`));
     if (id[0] === 'L') { d.appendChild(el('div', 'dm', `${id}．${COLOR_NAME[x.color]}屬性．${x.race}`)); d.appendChild(el('div', 'row', `<b>${x.skill}</b>${x.text}`)); }
@@ -461,7 +463,7 @@
     };
     pn.innerHTML = `<div class="effhd"><span>${effOpen === 'act' ? '啟動效果一覽' : '獻祭效果一覽'}</span><button class="btn ghost small" id="effX">關閉</button></div><div class="effcols">${col(0)}${col(1)}</div>`;
     $('#effX').onclick = () => { effOpen = null; renderEff(); };
-    pn.querySelectorAll('.eff[data-id]').forEach(e => { e.addEventListener('pointerenter', () => { clearTimeout(focusOff); showDetail(e.dataset.id, true); }); e.addEventListener('pointerleave', () => { focusOff = setTimeout(() => $('#detail').classList.remove('focus'), 500); }); });
+    pn.querySelectorAll('.eff[data-id]').forEach(e => { e.addEventListener('pointerenter', () => { clearTimeout(focusOff); showDetail(e.dataset.id, true); }); e.addEventListener('pointerleave', () => { focusOff = setTimeout(hideDetail, 500); }); });
   }
   $('#effMe').onclick = () => { effOpen = effOpen === 'act' ? null : 'act'; if (G) renderEff(); };
   $('#effFoe').onclick = () => { effOpen = effOpen === 'sac' ? null : 'sac'; if (G) renderEff(); };
@@ -664,7 +666,7 @@
 
   // ---------- 彈窗選擇 ----------
   // 彈窗看牌時，左上詳細資訊浮到遮罩上方一起顯示
-  function detailOver(id) { const d = $('#detail'); $('#tip').hidden = true; if (id) { clearTimeout(ovHide); showDetail(id, true); d.classList.add('over'); } else { clearTimeout(ovShow); d.classList.remove('over', 'focus'); } }
+  function detailOver(id) { const d = $('#detail'); $('#tip').hidden = true; if (id) { clearTimeout(ovHide); showDetail(id, true); d.classList.add('over'); } else { clearTimeout(ovShow); hideDetail(); } }
   function modalCards(title, cards, o = {}) {
     return new Promise(res => {
       const m = $('#modal'), b = $('#mbox'); b.innerHTML = '';
