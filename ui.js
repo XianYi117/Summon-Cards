@@ -244,9 +244,12 @@
     c.addEventListener('pointerenter', e => {
       const t = $('#tip'); const d = info(id); if (!d) return;
       t.innerHTML = id[0] === 'L' ? `<b>${d.name}</b>．${d.skill}<br>${d.text}${extra || ''}` : `<b>${d.name}</b>（${COLOR_NAME[d.color]}）<br><b>啟動</b> ${d.act}<br><b>獻祭</b> ${d.sac}${extra || ''}`;
-      const r = relRect(c); let x = r.x + r.w + 8, y = r.y;
-      if (x + 230 > 1280) x = r.x - 230; if (y + 120 > 720) y = 720 - 130; if (y < 0) y = 4;
-      t.style.left = x + 'px'; t.style.top = y + 'px'; t.hidden = false;
+      const r = relRect(c); t.hidden = false;
+      const tw = t.offsetWidth, th = t.offsetHeight;
+      let x, y;
+      if (c.closest('#hand')) { x = Math.min(1280 - tw - 8, Math.max(8, r.x + r.w / 2 - tw / 2)); y = Math.max(4, r.y - th - 14); }  // 手牌：顯示在卡片正上方
+      else { x = r.x + r.w + 8; y = r.y; if (x + tw > 1280) x = r.x - tw - 8; if (y + th > 716) y = 716 - th; if (y < 4) y = 4; }
+      t.style.left = x + 'px'; t.style.top = y + 'px';
       clearTimeout(tipTimer); clearTimeout(focusOff); tipTimer = setTimeout(() => showDetail(id, true), 150);
     });
     c.addEventListener('pointerleave', () => { $('#tip').hidden = true; clearTimeout(tipTimer); clearTimeout(focusOff); focusOff = setTimeout(hideDetail, 500); });
