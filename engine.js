@@ -44,7 +44,7 @@
   const SAC_VAL = { F06: .9, W04: .9, G03: .9, W03: .7, F04: .6, F07: .6, W08: .7, G06: .7, W09: .9, G08: .7, F01: .6, W02: .6, G01: .6, F05: .4, W06: .4, G07: .6, F02: .4, W01: .4, G04: .4, F03: .4, W05: .4, G02: .4, F08: .4, F09: .2, W07: .2, G05: .3, G09: .1 };
   const cval = id => (STATIC_VAL[id] || .3) + .5 * (SAC_VAL[id] || .3);
   const COUNTERS = ['F04', 'F07'];
-  const UNCOUNTERABLE = ['W08', 'G06'];
+  const BLOCKERS = ['W08', 'G06']; // 本回合對手獻祭無效：可以主動先獻祭，也可以在對手獻祭時當反擊用
   const COPYABLE = id => id !== 'G07' && !COUNTERS.includes(id);
 
   function buildDeck(type) {
@@ -307,14 +307,15 @@
       st.up = false; p.sacUsed = true;
       this.note(`獻祭 ${CARDS[st.id].name}：${CARDS[st.id].sac}`, i);
       await this.ui.ev('sacrifice', { i, statue: st });
-      if (!COUNTERS.includes(st.id) && !UNCOUNTERABLE.includes(st.id)) { // W08、G06「本回合對手獻祭無效」不能被反擊
+      if (!COUNTERS.includes(st.id)) {
         const j = 1 - i;
-        const opts = this.canSacList(j).filter(s => COUNTERS.includes(s.id));
+        const opts = this.canSacList(j).filter(s => COUNTERS.includes(s.id) || BLOCKERS.includes(s.id));
         if (opts.length) {
           const r = await this.ctrl[j].respondCounter(this, j, st.id, opts);
           if (r) {
             r.up = false; this.p[j].sacUsed = true;
             this.note(`【反擊】${CARDS[r.id].name}：讓 ${CARDS[st.id].name} 的效果無效`, j);
+            if (BLOCKERS.includes(r.id)) this.ctx.blocked[i] = true;
             await this.ui.ev('counter', { i: j, statue: r, target: st });
             this.checkAlt();
             return true;
