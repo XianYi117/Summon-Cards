@@ -84,7 +84,7 @@
     canSacList(i) {
       const p = this.p[i];
       if (p.sacUsed || (this.ctx && this.ctx.blocked[i])) return [];
-      return p.statues.filter(s => s.up && !s.sealed && !s.maint);
+      return p.statues.filter(s => s.up && !s.sealed && !(s.maint && !p.lsealed));
     }
 
     // ---------- 抽牌 ----------
@@ -137,11 +137,9 @@
       const k = o.statues.indexOf(target); if (k < 0) return;
       const wasActive = target.up && !target.sealed;
       o.statues.splice(k, 1); o.disc.push({ uid: target.uid, id: target.id });
+      this.releaseL13(); // 維持石像或被封印的石像被破壞：解除對應的封印
       this.note(`破壞了 ${CARDS[target.id].name}`, i);
       await this.ui.ev('destroy', { i, owner: 1 - i, statue: target });
-      if (target.maint) { // L13 維持者被破壞，解除一個封印
-        const s = this.p[i].statues.find(x => x.byL13); if (s) { s.byL13 = false; s.sealed = false; }
-      }
       const n = this.count(o, 'F06') + this.count(o, 'G09') + (wasActive && ['F06', 'G09'].includes(target.id) ? 1 : 0);
       if (n) await this.extraDraw(1 - i, 2 * n);
       this.checkAlt();
@@ -189,24 +187,40 @@
       }
       this.checkAlt();
     }
-    // L13：整理階段重新指定封印（維持到下一次整理）
+    // L13：封印一旦選定就固定；維持石像（2 座）或被封印的石像離場才解除
+    releaseL13() {
+      for (const i of [0, 1]) {
+        const p = this.p[i], o = this.opp(i);
+        for (const t of o.statues.filter(x => x.byL13)) {
+          const keep = p.statues.filter(m => m.maint === t.uid && m.up);
+          if (keep.length < 2 || !t.up) { t.byL13 = false; if (!t.tmpSeal) t.sealed = false; p.statues.forEach(m => { if (m.maint === t.uid) m.maint = null; }); this.note(`雙界封印解除：${CARDS[t.id].name}`, i); }
+        }
+        p.statues.forEach(m => { if (m.maint && !o.statues.some(t => t.uid === m.maint && t.byL13)) m.maint = null; });
+      }
+    }
+    // 封魔者被封印的回合，雙界封印暫時失效
+    syncL13() {
+      for (const i of [0, 1]) {
+        const p = this.p[i], o = this.opp(i);
+        for (const t of o.statues.filter(x => x.byL13)) t.sealed = !p.lsealed || !!t.tmpSeal;
+      }
+    }
+    // 整理階段：用還沒在維持封印的成對石像，追加封印
     async l13Cleanup() {
+      this.releaseL13(); this.syncL13();
       for (const i of [this.first, 1 - this.first]) {
         const p = this.p[i], o = this.opp(i);
-        if (p.leader !== 'L13') continue;
-        o.statues.forEach(s => { if (s.byL13) { s.byL13 = false; s.sealed = false; } });
-        p.statues.forEach(s => s.maint = false);
         if (!this.lead(p, 'L13')) continue;
-        const c = {}; this.upright(p).forEach(s => (c[s.id[0]] = c[s.id[0]] || []).push(s));
+        const c = {}; this.upright(p).filter(s => !s.maint).forEach(s => (c[s.id[0]] = c[s.id[0]] || []).push(s));
         let slots = 0; Object.values(c).forEach(a => slots += Math.floor(a.length / 2));
-        const tg = o.statues.filter(s => s.up && !s.sealed);
-        let n = Math.min(slots, tg.length);
+        const tg = o.statues.filter(s => s.up && !s.sealed && !s.byL13);
+        const n = Math.min(slots, tg.length);
         if (!n) continue;
-        const picked = (await this.ctrl[i].pick(this, i, 'l13', { statues: tg, n, title: `雙界封印：選擇 ${n} 座對手石像封印` })) || [];
+        const picked = (await this.ctrl[i].pick(this, i, 'l13', { statues: tg, n, title: `雙界封印：選擇 ${n} 座對手石像封印（選定後不能更換）` })) || [];
         const chosen = [...new Set(picked)].filter(s => tg.includes(s)).slice(0, n);
         for (const s of tg) if (chosen.length < n && !chosen.includes(s)) chosen.push(s);
-        chosen.forEach(s => { s.sealed = true; s.byL13 = true; });
-        for (const col in c) { const pairs = Math.min(Math.floor(c[col].length / 2), n); c[col].slice(0, pairs * 2).forEach(s => s.maint = true); n -= pairs; }
+        const pairs = []; for (const col in c) for (let k = 0; k + 1 < c[col].length; k += 2) pairs.push([c[col][k], c[col][k + 1]]);
+        chosen.forEach((t, k) => { t.sealed = true; t.byL13 = true; pairs[k].forEach(m => m.maint = t.uid); });
         this.note(`雙界封印：封印 ${chosen.map(s => CARDS[s.id].name).join('、')}`, i);
         await this.ui.ev('seal', { i });
       }
@@ -351,7 +365,7 @@
         }
         case 'W08': case 'G06': ctx.blocked[1 - i] = true; this.note('本回合對手不能獻祭', i); break;
         case 'W09': ctx.extraPt[i] = true; break;
-        case 'G05': o.lsealed = true; this.note('封印對手隊長到回合結束', i); await this.ui.ev('seal', { i }); break;
+        case 'G05': o.lsealed = true; this.syncL13(); this.note('封印對手隊長到回合結束', i); await this.ui.ev('seal', { i }); break;
         case 'G07': {
           const tg = [...this.p[i].statues, ...o.statues].filter(s => s.up && !s.sealed && COPYABLE(s.id) && !(id === 'G08' && phase !== 'post'));
           const ok = tg.filter(s => s.id !== 'G08' || phase === 'post');
@@ -383,6 +397,7 @@
     async playTurn() {
       this.turn++;
       this.p.forEach(p => { p.sacUsed = false; p.lsealed = false; });
+      this.syncL13();
       this.ctx = { core: [null, null], cat: [null, null], bonus: [0, 0], immune: [false, false], blocked: [false, false], extraPt: [false, false] };
       this.played = [[], []];
       this.phase = 'draw';

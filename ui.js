@@ -154,7 +154,7 @@
 <h3>6. 效果處理</h3><ul><li>每回合觸發的啟動效果，都在補牌後處理。雙方同時觸發時，起始玩家先處理。</li><li>技能帶來的額外抽牌不受 5 張限制，但下回合補牌仍以 5 張為準。</li><li>獻祭得到的能力只持續本回合。</li></ul>
 <h3>7. 勝利的細節</h3><ul><li>隊長的特殊勝利條件一達成，就立刻獲勝。</li><li>需要指定顏色才能獲勝的隊長（L11 冥火貓妖），開局要<b>宣告</b>主色是哪個屬性，雙方都看得到。</li><li>雙方同時達成勝利條件時，進入搶 1 分加賽。</li></ul>
 <h3>8. 隊長說明</h3><div class="tbl"><table><tr><th>隊長</th><th>說明</th></tr>${leaderIds.map(id => `<tr><td>${id} ${LEADERS[id].name}</td><td>${LEADERS[id].text}</td></tr>`).join('')}</table></div>
-<p>L13 封魔者：在整理階段選擇要封印的對手直立石像（每 2 座自己的同屬性直立石像封印 1 座），封印維持到下一次整理再重新選擇；負責維持的石像不能獻祭，被破壞就解除 1 座封印；同時封印 4 座獲勝。</p>
+<p>L13 封魔者：在整理階段，每 2 座自己的同屬性直立石像（還沒在維持封印的）可以封印 1 座對手直立石像。封印選定後就固定，不能更換；之後的整理只能用新的成對石像追加封印。負責維持的 2 座石像不能獻祭；維持的石像或被封印的石像被破壞，該封印就解除，之後可以再封印新的目標。封魔者被封印的回合，雙界封印暫時失效。同時封印 4 座獲勝。</p>
 <p>L12 專屬戰力：A、AA、AAA、AAAA＝1；AB、AAB、AAAB＝3；AABB＝4；ABC＝5；AABC＝6。對手不能剋制 L12。</p>
 </details>`;
   }
@@ -384,7 +384,7 @@
       if (c.blocked[idx]) out.push({ t: 'debuff', h: '本回合', d: '不能獻祭' });
     }
     if (p.sacUsed) out.push({ t: 'debuff', h: '本回合', d: '已經獻祭過' });
-    for (const s of p.statues.filter(x => x.up)) out.push({ t: 'st', id: s.id, h: CARDS[s.id].name, d: CARDS[s.id].act, off: s.sealed ? (s.byL13 ? '被雙界封印' : '封印中') : '', note: s.maint ? '維持雙界封印中，不能獻祭' : '' });
+    for (const s of p.statues.filter(x => x.up)) out.push({ t: 'st', id: s.id, h: CARDS[s.id].name, d: CARDS[s.id].act, off: s.sealed ? (s.byL13 ? '被雙界封印' : '封印中') : '', note: s.maint ? '維持雙界封印中，不能獻祭' : s.byL13 && !s.sealed ? '雙界封印暫時失效（封魔者被封印）' : '' });
     const down = p.statues.filter(x => !x.up).length;
     if (down) out.push({ t: 'info', h: '已獻祭石像', d: `${down} 座（沒有能力）` });
     return out;

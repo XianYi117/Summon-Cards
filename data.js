@@ -46,7 +46,7 @@ const LEADERS = {
   L10: { name: '三界召喚師', color: 'N', race: '靈體', skill: '三界契約', text: '火水草直立石像各 2 座：獲勝' },
   L11: { name: '冥火貓妖', color: 'N', race: '獸', skill: '主色號令', text: '選主色；主色石像 2 座：戰力 +2；4 座：獲勝' },
   L12: { name: '幻術蠱王', color: 'N', race: '蟲', skill: '變色之術', text: '雜色越強（ABC 5、AABC 6）；最左張決定屬性，剋制不限牌型、不會被剋；沒成對時召喚最左 1 張' },
-  L13: { name: '封魔者', color: 'N', race: '人', skill: '雙界封印', text: '整理時：每 2 座同屬性直立石像，封印對手 1 座；封印 4 座：獲勝' },
+  L13: { name: '封魔者', color: 'N', race: '人', skill: '雙界封印', text: '整理時：每 2 座同屬性直立石像封印對手 1 座（選定後固定）；封印 4 座：獲勝' },
 };
 for (const id in LEADERS) LEADERS[id].id = id;
 
