@@ -29,7 +29,7 @@
   }
 
   // ---------- 畫面切換 ----------
-  const screens = ['home', 'pick', 'vs', 'battle', 'rules', 'gallery', 'online'];
+  const screens = ['home', 'pick', 'vs', 'battle', 'rules', 'gallery', 'online', 'watchScr'];
   function show(id) { screens.forEach(s => $('#' + s).hidden = s !== id); if (id === 'battle') fitStage(); }
   document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('home'));
 
@@ -220,7 +220,8 @@
   // ================= 對戰 =================
   let G = null, scale = 1, mode = 'idle', sel = [], fresh = new Set(), freshPlay = new Set(), freshStatue = new Set(), sacFx = new Set();
   let lockCards = [null, null]; const sacTurn = new Set(); // 本回合獻祭的石像 // 同時出牌：已鎖定但尚未翻開的牌
-  let ME = 0; const P = slot => slot === 0 ? ME : 1 - ME; // 畫面位置(0=我方) → 引擎玩家編號
+  let ME = 0, spectating = false;
+  const SN = slot => spectating ? (slot === 0 ? '玩家 A' : '玩家 B') : (slot === 0 ? '我方' : '對手'); const P = slot => slot === 0 ? ME : 1 - ME; // 畫面位置(0=我方) → 引擎玩家編號
   let resolver = null, pickables = null, revealed = false, lastSettle = null, logs = [], t0 = 0, tEnd = 0, clockT = null;
   const mmss = ms => { const t = Math.max(0, Math.floor(ms / 1000)); return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
   function tickClock() { const c = $('#clock'); if (c) c.textContent = '⏱ ' + mmss((tEnd || Date.now()) - t0); }
@@ -267,20 +268,29 @@
   }
 
   const lockFx = c => ({ ...c, async choose(g, i, ph) { const r = await c.choose(g, i, ph); if (G === g && g.phase === 'choose') { lockCards[i] = r; renderAll(); } return r; } });
+  // 每場對局的畫面事件只處理「目前這一場」；被新的一場取代的舊對局會停在原地不再前進
+  let curGame = null;
+  const uiFor = () => { const token = {}; curGame = token; return { ev: (n, d) => curGame === token ? onEvent(n, d) : new Promise(() => {}), log: (t, w) => { if (curGame === token) addLog(t, w); } }; };
   function startBattle(online) {
     lockCards = [null, null];
-    if (online) {
-      ME = online.me;
+    if (online && online.spectate) {
+      // 觀戰：用對局端的亂數種子與牌組重建同一場，照收到的決定重播
+      spectating = true; ME = 0;
+      G = new Game({ players: online.cfgs, seed: online.seed, controllers: [lockFx(SpecCtrl), lockFx(SpecCtrl)], ui: uiFor() });
+    } else if (online) {
+      spectating = false; ME = online.me;
       const ctrls = []; ctrls[ME] = lockFx(NetHuman); ctrls[1 - ME] = lockFx(Remote);
-      G = new Game({ players: online.cfgs, seed: online.seed, controllers: ctrls, ui: { ev: onEvent, log: addLog } });
+      if (net.host) { ctrls[0] = rec.wrap(ctrls[0]); ctrls[1] = rec.wrap(ctrls[1]); }
+      G = new Game({ players: online.cfgs, seed: online.seed, controllers: ctrls, ui: uiFor() });
+      if (net.host) rec.begin({ seed: online.seed, cfgs: online.cfgs });
     } else {
-      ME = 0; net.on = false;
-      const me = cfg.me, foe = cfg.foe;
-      G = new Game({
-        players: [{ leader: me.realLeader, deck: me.cards || me.deck, main: me.main }, { leader: foe.realLeader, deck: foe.cards || foe.deck, main: foe.main }],
-        controllers: [lockFx(Human), lockFx(AI)], ui: { ev: onEvent, log: addLog },
-      });
+      spectating = false; ME = 0; net.on = false; watch.close();
+      const me = cfg.me, foe = cfg.foe, seed = (Math.random() * 2 ** 31) | 0;
+      const players = [{ leader: me.realLeader, deck: me.cards, main: me.main }, { leader: foe.realLeader, deck: foe.cards, main: foe.main }];
+      G = new Game({ players, seed, controllers: [rec.wrap(lockFx(Human)), rec.wrap(lockFx(AI))], ui: uiFor() });
+      rec.begin({ seed, cfgs: players });
     }
+    rec.ui();
     $('#netState').hidden = true; $('#deckView').hidden = true; sacTurn.clear();
     mode = 'idle'; sel = []; fresh = new Set(G.p[ME].hand.map(c => c.uid)); freshPlay.clear(); freshStatue.clear(); sacFx.clear(); revealed = false; lastSettle = null; logs = [];
     t0 = Date.now(); tEnd = 0; clearInterval(clockT); clockT = setInterval(tickClock, 1000); tickClock();
@@ -289,6 +299,7 @@
     G.turnLoop().catch(err => { console.error(err); banner('發生錯誤，請重新開局'); });
   }
   function addLog(text, who) {
+    if (who == null && spectating) text = text.replace('我方', '玩家 A').replace('對手', '玩家 B');
     if (who == null && ME === 1) text = text.replace(/戰力 (\S+) 對 (\S+)，/, '戰力 $2 對 $1，').replace(/我方|對手/, m => m === '我方' ? '對手' : '我方');
     if (who === 0 || who === 1) who = who === ME ? 0 : 1;
     logs.push({ text, who, turn: G ? G.turn : 0, t: Date.now() - t0 }); }
@@ -298,7 +309,7 @@
   function renderAll() {
     if (!G) return;
     $('#tip').hidden = true;
-    $('#turnNo').textContent = `回合 ${G.turn}．起始：${G.first === ME ? '我方' : '對手'}`;
+    $('#turnNo').textContent = `回合 ${G.turn}．起始：${SN(G.first === ME ? 0 : 1)}`;
     $('#phase').textContent = PHASE[G.phase] || '';
     renderSide(0); renderSide(1); renderOrbs(); renderStatues(0); renderStatues(1); renderPlays(); renderHand(); renderFoeHand(); renderAct(); renderLive(); renderEff();
   }
@@ -349,11 +360,11 @@
     const pl = el('div', 'pl ' + (i === 0 ? 'me' : 'foe') + (p.lsealed ? ' sealedL' : ''));
     const c = cardEl(p.leader); bindHover(c, p.leader, p.lsealed ? '<br><b>本回合被封印</b>' : ''); pl.appendChild(c);
     const g = goalText(p);
-    pl.appendChild(el('div', '', `<div class="pn">${i === 0 ? '我方' : '對手'}．${LEADERS[p.leader].name}</div>
+    pl.appendChild(el('div', '', `<div class="pn">${SN(i)}．${LEADERS[p.leader].name}</div>
       <div class="ps">得分 <b>${p.score}</b>／4<br>牌庫 <b>${p.deck.length}</b>．棄牌 <b>${p.disc.length}</b>${i === 1 ? `．手牌 <b>${p.hand.length}</b>` : ''}</div>
       ${g ? `<div class="goal">${g}</div>` : ''}${p.lsealed ? '<div class="goal" style="color:#d9c2ff">隊長被封印</div>' : ''}`));
     box.appendChild(pl);
-    $(i === 0 ? '#pileMe' : '#pileFoe').innerHTML = `查看${i === 0 ? '我方' : '對手'}棄牌 <b>${p.disc.length}</b>`;
+    $(i === 0 ? '#pileMe' : '#pileFoe').innerHTML = `查看${SN(i)}棄牌 <b>${p.disc.length}</b>`;
   }
   function renderOrbs() {
     for (const [i, box] of [[0, $('#orbsMe')], [1, $('#orbsFoe')]]) {
@@ -368,7 +379,7 @@
     const p = G.p[P(i)], z = i === 0 ? $('#zMeSt') : $('#zFoeSt');
     z.innerHTML = '';
     const keep = el('div', 'st-keep'), sac = el('div', 'st-sac');
-    keep.appendChild(el('span', 'zl', i === 0 ? '我方石像區' : '對手石像區'));
+    keep.appendChild(el('span', 'zl', SN(i) + '石像區'));
     sac.appendChild(el('span', 'zl', '獻祭區'));
     const up = p.statues.filter(s => s.up), down = [...p.statues.filter(s => !s.up && !sacTurn.has(s.uid)), ...p.statues.filter(s => !s.up && sacTurn.has(s.uid))];
     sac.classList.toggle('hot', down.some(s => sacTurn.has(s.uid)));
@@ -410,7 +421,7 @@
   }
   function renderHand() {
     const h = $('#hand'); h.innerHTML = ''; const cards = G.p[ME].hand.filter(c => !(lockCards[ME] && lockCards[ME].includes(c)) && !(G.played[ME] || []).includes(c)); const n = cards.length;
-    h.classList.toggle('locked', mode !== 'choose');
+    h.classList.toggle('locked', mode !== 'choose' && !spectating);
     cards.forEach((c, k) => {
       const e = cardEl(c.id, { uid: c.uid }); const off = k - (n - 1) / 2;
       e.style.setProperty('--rot', off * 3.5 + 'deg'); e.style.setProperty('--ty', Math.abs(off) * 6 + 'px');
@@ -428,7 +439,8 @@
   }
   function renderFoeHand() {
     const h = $('#foeHand'); h.innerHTML = '';
-    G.p[1 - ME].hand.forEach(() => h.appendChild(cardEl(null, { down: true })));
+    h.classList.toggle('open', spectating);
+    G.p[1 - ME].hand.forEach(c => { if (!spectating) { h.appendChild(cardEl(null, { down: true })); return; } const e = cardEl(c.id, { uid: c.uid }); bindHover(e, c.id); h.appendChild(e); });
   }
   // 效果一覽：分成「啟動效果」與「獻祭效果」兩個按鈕，打開後同時列出雙方
   let effOpen = null;
@@ -462,7 +474,7 @@
     if (effOpen === null) return;
     const col = slot => {
       const items = effList(P(slot), effOpen);
-      return `<div class="effcol ${slot === 0 ? 'me' : 'foe'}"><h4>${slot === 0 ? '我方' : '對手'}</h4>${items.map(e => `<div class="eff ${e.t}${e.off ? ' off' : ''}"${e.id ? ` data-id="${e.id}"` : ''}><b>${e.h}</b>${e.d}${e.off ? `<em>${e.off}</em>` : ''}${e.note ? `<em>${e.note}</em>` : ''}</div>`).join('')}</div>`;
+      return `<div class="effcol ${slot === 0 ? 'me' : 'foe'}"><h4>${SN(slot)}</h4>${items.map(e => `<div class="eff ${e.t}${e.off ? ' off' : ''}"${e.id ? ` data-id="${e.id}"` : ''}><b>${e.h}</b>${e.d}${e.off ? `<em>${e.off}</em>` : ''}${e.note ? `<em>${e.note}</em>` : ''}</div>`).join('')}</div>`;
     };
     pn.innerHTML = `<div class="effhd"><span>${effOpen === 'act' ? '啟動效果一覽' : '獻祭效果一覽'}</span><button class="btn ghost small" id="effX">關閉</button></div><div class="effcols">${col(0)}${col(1)}</div>`;
     $('#effX').onclick = () => { effOpen = null; renderEff(); };
@@ -485,6 +497,7 @@
   function renderAct() {
     const a = $('#actbar'); a.innerHTML = '';
     renderCheat(mode === 'choose' && sel.length ? shape(sel)[2] : null);
+    if (spectating) { a.appendChild(el('div', 'preview', `<b>觀戰中</b>．房號 ${watch.code}<br>上方是玩家 B、下方是玩家 A，雙方手牌都看得到${watch.catching ? '<br>正在快轉追上目前進度…' : ''}`)); return; }
     if (mode === 'choose') {
       if (sel.length) {
         const [, cat, name] = shape(sel);
@@ -542,7 +555,7 @@
   function flashStatue(uid) { const e = stage.querySelector(`.zone.st .card[data-uid="${uid}"]`); if (e) flash(relRect(e)); }
 
   // ---------- 引擎事件 ----------
-  const who = i => i === ME ? '我方' : '對手';
+  const who = i => SN(i === ME ? 0 : 1);
   async function onEvent(name, d) {
     switch (name) {
       case 'turnStart':
@@ -553,11 +566,13 @@
         renderAll(); await wait(d.i === ME ? 380 : 120); break;
       case 'discard': case 'retrieve': renderAll(); await wait(300); break;
       case 'peek':
-        if (d.i === ME) await modalCards('對手的手牌（隨機 2 張）', d.cards, { view: true });
+        if (spectating) await banner(`${who(d.i)}查看了對手 2 張手牌`, 700);
+        else if (d.i === ME) await modalCards('對手的手牌（隨機 2 張）', d.cards, { view: true });
         else await banner('對手查看了你 2 張手牌', 900);
         break;
       case 'seal': renderAll(); await wait(450); break;
       case 'sacrifice':
+        if (rec.start && !spectating && G.phase === 'choose') rec.push({ k: 'presac', who: d.i, uid: d.statue.uid });
         sacTurn.add(d.statue.uid); sacFx.add(d.statue.uid); renderAll(); flashStatue(d.statue.uid);
         await banner(`${who(d.i)}獻祭 ${CARDS[d.statue.id].name}：${CARDS[d.statue.id].sac}`, 1100); sacFx.delete(d.statue.uid); break;
       case 'counter':
@@ -577,14 +592,14 @@
         if (last && last.text.startsWith('戰力')) last.detail = [0, 1].map(slot => {
           const idx = P(slot), cards = G.played[idx];
           const adv = d.adv && d.adv[idx];
-          return { who: slot, text: `${slot === 0 ? '我方' : '對手'} ${d.pw[idx]}：出 ${cards.map(c => cname(c.id) + (c.as ? `（視為${COLOR_NAME[c.as]}）` : '')).join('、')}<br>　＝ ${brkText(d.br[idx])}${adv ? '' : ''}` };
+          return { who: slot, text: `${SN(slot)} ${d.pw[idx]}：出 ${cards.map(c => cname(c.id) + (c.as ? `（視為${COLOR_NAME[c.as]}）` : '')).join('、')}<br>　＝ ${brkText(d.br[idx])}${adv ? '' : ''}` };
         });
         await showSettle(d); break;
       }
       case 'summon':
         d.statues.forEach(s => freshStatue.add(s.uid));
         G.played[d.i] = []; renderAll(); await wait(d.statues.length ? 950 : 250); break;
-      case 'gameover': mode = 'idle'; resolver = null; pickables = null; lockCards = [null, null]; hideBanner(); await showResult(d); break;
+      case 'gameover': if (rec.start && !spectating) setTimeout(() => rec.end(), 4000); mode = 'idle'; resolver = null; pickables = null; lockCards = [null, null]; hideBanner(); await showResult(d); break;
     }
   }
   async function showSettle(d) {
@@ -606,8 +621,17 @@
   }
   async function showResult(d) {
     const w = d.winner; const howTxt = { points: '先拿到 4 分', leader: '達成隊長勝利條件', sudden: '加賽搶下 1 分', end: '回合上限，比較分數' }[d.how] || '';
-    if (!tEnd) { tEnd = Date.now(); clearInterval(clockT); tickClock(); saveHistory(w === ME ? 0 : w === 1 - ME ? 1 : -1, d.how); }
+    if (!tEnd) { tEnd = Date.now(); clearInterval(clockT); tickClock(); if (!spectating) saveHistory(w === ME ? 0 : w === 1 - ME ? 1 : -1, d.how); }
     const m = $('#modal'), b = $('#mbox'); b.innerHTML = '';
+    if (spectating) {
+      b.appendChild(el('div', 'result win', w === 0 ? '玩家 A 勝利' : w === 1 ? '玩家 B 勝利' : '平手'));
+      b.appendChild(el('p', '', `${howTxt}．比分 ${G.p[0].score} 比 ${G.p[1].score}．共 ${G.turn} 回合`));
+      b.appendChild(el('p', '', '對局結束。留在這裡會自動觀看同一個房號的下一場。'));
+      const r = el('div', 'mrow');
+      const home = el('button', 'btn', '離開觀戰'); home.onclick = () => { m.hidden = true; G = null; clearInterval(clockT); watch.close(); show('home'); };
+      const lg = el('button', 'btn ghost', '對局紀錄'); lg.onclick = () => openLog(() => showResult(d));
+      r.append(home, lg); b.appendChild(r); m.hidden = false; return;
+    }
     const rw = w === ME ? 0 : w === 1 - ME ? 1 : -1;
     b.appendChild(el('div', 'result ' + (rw === 0 ? 'win' : 'lose'), rw === 0 ? '勝利' : rw === 1 ? '敗北' : '平手'));
     b.appendChild(el('p', '', `${howTxt}．比分 ${G.p[ME].score} 比 ${G.p[1 - ME].score}．共 ${G.turn} 回合．用時 ${mmss(tEnd - t0)}`));
@@ -617,7 +641,7 @@
     const again = el('button', 'btn primary', '再戰一局');
     again.onclick = () => { m.hidden = true; if (net.on) { G = null; clearInterval(clockT); net.toPick(); } else { finalizeCfg(); startBattle(); } };
     if (net.on && !net.conn) again.disabled = true;
-    const home = el('button', 'btn', '回首頁'); home.onclick = () => { m.hidden = true; G = null; clearInterval(clockT); if (net.on) net.close(); show('home'); };
+    const home = el('button', 'btn', '回首頁'); home.onclick = () => { m.hidden = true; G = null; clearInterval(clockT); rec.end(); if (net.on) net.close(); show('home'); };
     const lg = el('button', 'btn ghost', '對局紀錄'); lg.onclick = () => openLog(() => showResult(d));
     r.append(again, home, lg); b.appendChild(r); m.hidden = false;
   }
@@ -630,7 +654,7 @@
   function openPile(idx) {
     if (!G || !$('#modal').hidden) return;
     const p = G.p[idx], m = $('#modal'), b = $('#mbox'); b.innerHTML = '';
-    b.appendChild(el('h3', '', `${idx === ME ? '我方' : '對手'}棄牌堆<small class="lgt">　共 ${p.disc.length} 張．1 是最上面那張</small>`));
+    b.appendChild(el('h3', '', `${SN(idx === ME ? 0 : 1)}棄牌堆<small class="lgt">　共 ${p.disc.length} 張．1 是最上面那張</small>`));
     const row = el('div', 'mcards pile');
     const list = p.disc.slice().reverse();
     list.forEach((c, k) => { const w = el('div', 'pcard'); const e = cardEl(c.id); hoverOver(e, c.id); w.append(el('span', 'pno', k + 1), e); row.appendChild(w); });
@@ -643,7 +667,7 @@
     const m = $('#modal'), b = $('#mbox'); b.innerHTML = '';
     b.appendChild(el('h3', '', `對局紀錄<small class="lgt">　${tEnd ? '總用時' : '已進行'} ${mmss((tEnd || Date.now()) - t0)}</small>`));
     const box = el('div', 'logbox');
-    logs.slice().reverse().forEach(l => box.appendChild(el('p', l.who === 0 ? 'me' : l.who === 1 ? 'foe' : '', `<i class="ts">${mmss(l.t)}</i>回合 ${l.turn}．${l.who === 0 ? '我方' : l.who === 1 ? '對手' : ''} ${l.text}${l.detail ? `<span class="lgd">${l.detail.map(x => `<span class="${x.who === 0 ? 'me' : 'foe'}">${x.text}</span>`).join('')}</span>` : ''}`)));
+    logs.slice().reverse().forEach(l => box.appendChild(el('p', l.who === 0 ? 'me' : l.who === 1 ? 'foe' : '', `<i class="ts">${mmss(l.t)}</i>回合 ${l.turn}．${l.who === 0 ? SN(0) : l.who === 1 ? SN(1) : ''} ${l.text}${l.detail ? `<span class="lgd">${l.detail.map(x => `<span class="${x.who === 0 ? 'me' : 'foe'}">${x.text}</span>`).join('')}</span>` : ''}`)));
     if (!logs.length) box.appendChild(el('p', '', '還沒有紀錄'));
     b.appendChild(box);
     const x = el('button', 'btn small', '關閉'); x.onclick = () => { m.hidden = true; if (after) after(); }; b.appendChild(x);
@@ -670,9 +694,9 @@
   $('#btnSpeed').onclick = e => { speed = speed === 1 ? .4 : 1; e.currentTarget.setAttribute('aria-pressed', speed !== 1); e.currentTarget.textContent = speed === 1 ? '加速' : '正常'; };
   $('#btnQuit').onclick = () => {
     const m = $('#modal'), b = $('#mbox'); b.innerHTML = '';
-    b.appendChild(el('h3', '', '要離開這局對戰嗎？')); b.appendChild(el('p', '', net.on ? '離開會中斷連線，對手會看到你已離線。' : '這局的進度不會保留。'));
+    b.appendChild(el('h3', '', spectating ? '要離開觀戰嗎？' : '要離開這局對戰嗎？')); b.appendChild(el('p', '', spectating ? '之後可以再用房號回來觀看。' : net.on ? '離開會中斷連線，對手會看到你已離線。' : '這局的進度不會保留。'));
     const r = el('div', 'mrow'); const y = el('button', 'btn primary', '離開'); const n = el('button', 'btn', '繼續對戰');
-    y.onclick = () => { m.hidden = true; G = null; resolver = null; clearInterval(clockT); if (net.on) net.close(); show('home'); }; n.onclick = () => m.hidden = true;
+    y.onclick = () => { m.hidden = true; G = null; resolver = null; clearInterval(clockT); if (spectating) watch.close(); else rec.end(); if (net.on) net.close(); show('home'); }; n.onclick = () => m.hidden = true;
     r.append(n, y); b.appendChild(r); m.hidden = false;
   };
 
@@ -831,6 +855,7 @@
         case 'cfg': this.peerCfg = m.cfg; renderNetPick(); if (this.host) this.tryStart(); return;
         case 'start': this.beginGame(m); return;
         case 'bye': this.lost('對手已離開房間'); return;
+        case 'watchcode': rec.remoteCode = m.code; rec.ui(); return;
       }
       if (m.g !== this.game) return;
       if (m.k === 'reqsac') { if (this.host) this.orderSac(1 - ME, m.uid); return; }
@@ -897,7 +922,7 @@
     peer.on('open', () => { $('#roomCode').textContent = code; $('#roomBox').hidden = false; onlineMsg('把房間代碼告訴朋友，等待對手加入…'); });
     peer.on('connection', conn => {
       if (net.conn) { conn.on('open', () => { conn.send({ k: 'full' }); setTimeout(() => conn.close(), 300); }); return; }
-      conn.on('open', () => { net.bind(conn); conn.send({ k: 'hello' }); net.toPick(); });
+      conn.on('open', () => { net.bind(conn); conn.send({ k: 'hello' }); if (rec.ready) conn.send({ k: 'watchcode', code: rec.code }); net.toPick(); });
     });
     peer.on('error', e => { if (e.type === 'unavailable-id') { net.close(); createRoom(); } else if (!net.conn) onlineMsg('建立房間失敗：' + (e.type || '網路錯誤'), true); });
   }
@@ -957,6 +982,166 @@
     },
   };
 
+  // ================= 觀戰 =================
+  // 對局端（電腦對戰的玩家、連線對戰的房主）記錄每一個決定並轉送給觀戰者；
+  // 觀戰者用同一個亂數種子和牌組重建這一場，照記錄重播。紀錄只放在記憶體，對局結束就清掉。
+  const WATCH_PREFIX = ROOM_PREFIX + 'w-';
+  const WATCH_MAX = 5;
+  const newCode = () => String(Math.floor(1000 + Math.random() * 9000)) + 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random() * 24)];
+  const rec = {
+    peer: null, code: '', ready: false, failed: false, conns: [], start: null, log: [], seq: 0, t0: 0, remoteCode: '',
+    async ensure() {
+      if (this.peer || this.failed) return;
+      try { await loadPeer(); } catch { this.failed = true; this.ui(); return; }
+      const mk = () => {
+        const code = newCode(); const peer = new window.Peer(WATCH_PREFIX + code); this.peer = peer;
+        peer.on('open', () => { this.code = code; this.ready = true; this.ui(); if (net.on && net.host) net.send({ k: 'watchcode', code }); });
+        peer.on('connection', conn => this.accept(conn));
+        peer.on('error', e => {
+          if (e.type === 'unavailable-id') { try { peer.destroy(); } catch { } this.peer = null; mk(); }
+          else if (!this.ready) { this.failed = true; this.peer = null; this.ui(); }
+        });
+      };
+      mk();
+    },
+    accept(conn) {
+      conn.on('open', () => {
+        if (this.conns.length >= WATCH_MAX) { conn.send({ k: 'full' }); setTimeout(() => { try { conn.close(); } catch { } }, 400); return; }
+        this.conns.push(conn); this.ui();
+        conn.send(this.start ? { k: 'sync', start: this.start, log: this.log, elapsed: Date.now() - this.t0 } : { k: 'idle' });
+      });
+      const drop = () => { if (this.conns.includes(conn)) { this.conns = this.conns.filter(c => c !== conn); this.ui(); } };
+      conn.on('close', drop); conn.on('error', drop);
+    },
+    cast(m) { for (const c of this.conns) try { if (c.open) c.send(m); } catch { } },
+    begin(start) { this.start = start; this.log = []; this.seq = 0; this.t0 = Date.now(); this.cast({ k: 'start', start }); this.ensure(); this.ui(); },
+    end() { if (!this.start) return; this.start = null; this.log = []; this.seq = 0; this.cast({ k: 'idle' }); this.ui(); },
+    push(m) { if (!this.start || !G || spectating) return; m.seq = ++this.seq; m.turn = G.turn; this.log.push(m); this.cast({ k: 'ev', m }); },
+    wrap(c) {
+      return {
+        ...c,
+        choose: async (g, i, ph) => { const r = await c.choose(g, i, ph); this.push({ k: 'play', who: i, uids: (r || []).map(x => x.uid) }); return r; },
+        decideSac: async (g, i, ph) => { const r = await c.decideSac(g, i, ph); this.push({ k: 'sac', who: i, uid: r ? r.uid : null }); return r; },
+        respondCounter: async (g, j, e, o) => { const r = await c.respondCounter(g, j, e, o); this.push({ k: 'counter', who: j, uid: r ? r.uid : null }); return r; },
+        pick: async (g, i, kind, o) => {
+          const r = await c.pick(g, i, kind, o);
+          this.push(kind === 'g08' ? { k: 'pick', who: i, g08: r && r.card ? { uid: r.card.uid, color: r.color } : null } : { k: 'pick', who: i, uids: (r || []).map(x => x.uid) });
+          return r;
+        },
+      };
+    },
+    ui() {
+      const e = $('#watchInfo'); if (!e) return;
+      if (spectating) { e.innerHTML = `觀戰中．房號 <b>${watch.code}</b>`; return; }
+      if (net.on && !net.host) { e.innerHTML = this.remoteCode ? `觀戰房號 <b>${this.remoteCode}</b>` : ''; return; }
+      if (this.failed) { e.textContent = '觀戰：未連網，暫時無法開放'; return; }
+      e.innerHTML = this.ready ? `觀戰房號 <b>${this.code}</b>．觀戰 ${this.conns.length}／${WATCH_MAX}` : '觀戰房號建立中…';
+    },
+  };
+
+  const watch = {
+    peer: null, conn: null, code: '', q: {}, w: {}, pre: [], preBusy: false, preW: [], catching: false, saved: 1,
+    reset() { this.q = {}; this.w = {}; this.pre = []; this.preBusy = false; const pw = this.preW; this.preW = []; pw.forEach(f => f()); },
+    msg(t, err) { const e = $('#wMsg'); if (e) { e.textContent = t; e.classList.toggle('err', !!err); } },
+    close() {
+      const c = this.conn, p = this.peer; this.conn = null; this.peer = null;
+      try { c && c.close(); } catch { } try { p && p.destroy(); } catch { }
+      if (spectating) { spectating = false; if (this.catching) { this.catching = false; speed = this.saved; } }
+      this.reset();
+    },
+    async join() {
+      const code = $('#wCode').value.trim().toUpperCase();
+      if (!/^\d{4}[A-Z]$/.test(code)) { this.msg('請輸入 4 個數字＋1 個英文字母的觀戰房號，例如 3842K', true); return; }
+      this.msg('連線中…');
+      try { await loadPeer(); } catch { this.msg('連線元件載入失敗，請確認網路後再試', true); return; }
+      this.close(); this.code = code;
+      const peer = new window.Peer(); this.peer = peer;
+      const timer = setTimeout(() => { if (!this.conn) { this.msg('找不到這個觀戰房號，請確認對局還在進行', true); this.close(); } }, 12000);
+      peer.on('open', () => {
+        const conn = peer.connect(WATCH_PREFIX + code, { reliable: true });
+        conn.on('open', () => { clearTimeout(timer); if (this.peer !== peer) return; this.conn = conn; if (!spectating) this.msg('已連上，等待對局資料…'); });
+        conn.on('data', d => this.onData(d));
+        conn.on('close', () => { if (this.conn === conn) this.lost(); });
+      });
+      peer.on('error', e => { clearTimeout(timer); if (!this.conn) { this.msg(e.type === 'peer-unavailable' ? '找不到這個觀戰房號，請確認對局還在進行' : '連線失敗：' + (e.type || '網路錯誤'), true); this.close(); } });
+    },
+    lost() {
+      this.conn = null;
+      if (G && spectating && G.winner === null) { G = null; resolver = null; clearInterval(clockT); }
+      const m = $('#modal'), b = $('#mbox'); b.innerHTML = '';
+      b.append(el('h3', '', '觀戰結束'), el('p', '', '對局端已離開或對局已結束。'));
+      const ok = el('button', 'btn primary', '回首頁'); ok.onclick = () => { m.hidden = true; this.close(); show('home'); };
+      b.appendChild(ok); m.hidden = false;
+    },
+    onData(m) {
+      if (!m || typeof m !== 'object') return;
+      switch (m.k) {
+        case 'full': this.msg('這個房間的觀戰人數已滿（最多 5 人）', true); this.close(); return;
+        case 'idle': if (!G || !spectating) this.msg('已連上。目前沒有進行中的對局，下一場開始時會自動進入觀戰。'); return;
+        case 'sync': this.begin(m.start, m.log || [], m.elapsed || 0); return;
+        case 'start': this.begin(m.start, [], 0); return;
+        case 'ev': if (spectating && G) this.add(m.m); return;
+      }
+    },
+    begin(start, log, elapsed) {
+      this.reset();
+      this.catching = log.length > 0;
+      if (this.catching) { if (speed) this.saved = speed; speed = 0; }
+      startBattle({ spectate: true, seed: start.seed, cfgs: start.cfgs });
+      t0 = Date.now() - elapsed;
+      for (const m of log) this.add(m);
+      renderAct();
+    },
+    add(m) {
+      if (m.k === 'presac') { this.pre.push(m); this.pump(); return; }
+      const key = m.k + m.who, w = this.w[key];
+      if (w && w.length) w.shift()(m); else (this.q[key] || (this.q[key] = [])).push(m);
+    },
+    next(kind, who, g) {
+      if (g && g !== G) return new Promise(() => {});
+      return new Promise(res => {
+        const key = kind + who, q = this.q[key];
+        if (q && q.length) return res(q.shift());
+        (this.w[key] || (this.w[key] = [])).push(res);
+        if (this.catching) { this.catching = false; speed = this.saved || 1; renderAct(); banner('已追上進度，現在是即時觀戰', 1200); }
+      });
+    },
+    async pump() {
+      if (this.preBusy) return; this.preBusy = true;
+      while (this.pre.length && G && spectating && G.winner === null) {
+        const m = this.pre[0];
+        if (m.turn !== G.turn || G.phase !== 'choose') break;
+        const st = G.p[m.who].statues.find(x => x.uid === m.uid);
+        if (st) await G.sacrifice(m.who, st, 'pre');
+        this.pre.shift();
+        if (G) renderAll();
+      }
+      this.preBusy = false; const pw = this.preW; this.preW = []; pw.forEach(f => f());
+    },
+    async presacBefore(seq) {
+      for (let k = 0; k < 200; k++) {
+        if (!G || G.winner !== null || !this.pre.some(m => m.seq < seq)) return;
+        const p = new Promise(r => this.preW.push(r)); this.pump(); await p;
+        if (!this.preBusy && this.pre.some(m => m.seq < seq) && (this.pre[0].turn !== G.turn || G.phase !== 'choose')) await new Promise(r => setTimeout(r, 30));
+      }
+    },
+  };
+  const SpecCtrl = {
+    async choose(g, i) { watch.pump(); const m = await watch.next('play', i, g); await watch.presacBefore(m.seq); return byUid(g.p[i].hand, m.uids); },
+    async decideSac(g, i) { const m = await watch.next('sac', i, g); return m.uid == null ? null : g.canSacList(i).find(s => s.uid === m.uid) || null; },
+    async respondCounter(g, j, effId, opts) { const m = await watch.next('counter', j, g); return m.uid == null ? null : opts.find(s => s.uid === m.uid) || null; },
+    async pick(g, i, kind, o) {
+      const m = await watch.next('pick', i, g);
+      if (kind === 'g08') return m.g08 ? { card: o.cards.find(c => c.uid === m.g08.uid), color: m.g08.color } : null;
+      return byUid(o.cards || o.statues, m.uids);
+    },
+  };
+  $('#btnWatch').onclick = () => { watch.close(); watch.msg(''); show('watchScr'); };
+  $('#wJoin').onclick = () => watch.join();
+  $('#wCode').onkeydown = e => { if (e.key === 'Enter') watch.join(); };
+  $('#wBack').onclick = () => { watch.close(); show('home'); };
+
+  window.__summonLog = () => logs.map(l => `${l.turn}|${l.who}|${l.text}`);
   window.__summonState = () => G && JSON.stringify({ me: ME, turn: G.turn, phase: G.phase, first: G.first, q: Object.values(net.queues).reduce((a, x) => a + x.length, 0), w: Object.values(net.waiters).reduce((a, x) => a + x.length, 0), p: G.p.map(p => ({ s: p.score, h: p.hand.map(c => c.uid), d: p.deck.length, x: p.disc.length, st: p.statues.map(t => t.uid + (t.up ? '' : 'v') + (t.sealed ? 's' : '')), u: p.sacUsed })) });
   show('home');
 })();

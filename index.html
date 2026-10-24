@@ -294,6 +294,8 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .dvcard.F{border-left-color:var(--fire)}.dvcard.W{border-left-color:var(--water)}.dvcard.G{border-left-color:var(--grass)}
 .dvcard .card{--w:58px;flex:none}
 .dvtx{display:grid;gap:2px;font-size:12px;line-height:1.45}.dvtx b{font-size:13px;color:var(--gold-hi)}.dvtx i{font-style:normal;color:var(--muted);margin-right:4px}
+.watchinfo{font-size:12px;color:var(--muted);min-height:0}.watchinfo b{color:var(--gold-hi);letter-spacing:.12em}
+.foe-hand.open{top:4px}.foe-hand.open .card{--w:64px;margin:0 2px}
 .cheat{position:relative;flex:none;box-sizing:border-box;width:100%;overflow:hidden;background:#11151c;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px}
 .cheat h4{flex-wrap:wrap;gap:0 6px;margin:0 0 4px;font-family:var(--f-display);font-size:13px;color:var(--gold-hi);letter-spacing:.1em;display:flex;justify-content:space-between;align-items:center}
 .cheat h4 small{font-family:var(--f-body);font-weight:400;color:var(--muted);font-size:11px;letter-spacing:0}
@@ -367,6 +369,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
       <div class="home-menu">
         <button class="btn primary" id="btnStart">開始對戰（電腦）</button>
         <button class="btn primary" id="btnOnline">連線對戰（雙人）</button>
+        <button class="btn" id="btnWatch">觀戰戰局</button>
         <button class="btn" id="btnRules">規則說明</button>
         <button class="btn" id="btnGallery">圖鑑一覽</button>
       </div>
@@ -428,6 +431,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
         <div class="phase" id="phase">準備</div>
         <div class="clock" id="clock">⏱ 00:00</div>
         <div class="netstate" id="netState" hidden>等待對手…</div>
+        <div class="watchinfo" id="watchInfo"></div>
         <div class="tools">
           <button class="btn ghost small" id="btnRuleQ">規則</button>
           <button class="btn ghost small" id="btnLog">紀錄</button>
@@ -469,6 +473,23 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
       </div>
       <p class="onmsg" id="onMsg" role="status"></p>
       <p class="onnote">連上後雙方各自選擇隊長和牌組，兩人都按「準備完成」就會開始。部分公司或學校網路可能無法連線。</p>
+    </div>
+  </section>
+
+  <!-- 觀戰 -->
+  <section class="screen" id="watchScr" hidden>
+    <div class="page">
+      <div class="page-head"><div><div class="step">WATCH</div><h2>觀戰戰局</h2></div><button class="btn ghost small" id="wBack">回首頁</button></div>
+      <div class="lobby">
+        <div class="lob-card">
+          <h3>輸入觀戰房號</h3>
+          <p>對戰中的玩家畫面右側會顯示「觀戰房號」，跟電腦對戰或連線對戰都有。</p>
+          <input id="wCode" maxlength="5" placeholder="例如 3842K" autocomplete="off" aria-label="觀戰房號">
+          <button class="btn primary" id="wJoin">開始觀戰</button>
+        </div>
+      </div>
+      <p class="onmsg" id="wMsg" role="status"></p>
+      <p class="onnote">每個房間最多 5 人觀戰。中途加入會先快轉追上目前進度，再即時同步。觀戰時看得到雙方手牌。</p>
     </div>
   </section>
 
