@@ -528,6 +528,8 @@
   };
 
   // ---------- 彈窗選擇 ----------
+  // 彈窗看牌時，左上詳細資訊浮到遮罩上方一起顯示
+  function detailOver(id) { const d = $('#detail'); $('#tip').hidden = true; if (id) { showDetail(id, true); d.classList.add('over'); } else d.classList.remove('over', 'focus'); }
   function modalCards(title, cards, o = {}) {
     return new Promise(res => {
       const m = $('#modal'), b = $('#mbox'); b.innerHTML = '';
@@ -536,8 +538,9 @@
       const row = el('div', 'mcards'); const chosen = [];
       const n = o.n || 1;
       const ok = el('button', 'btn primary', o.view ? '知道了' : '確定');
+      detailOver(cards[0] && cards[0].id);
       cards.forEach(c => {
-        const id = c.id; const e = cardEl(id); bindHover(e, id);
+        const id = c.id; const e = cardEl(id); e.addEventListener('pointerenter', () => showDetail(id, true));
         if (!o.view) e.onclick = () => {
           const k = chosen.indexOf(c); if (k >= 0) chosen.splice(k, 1); else { if (chosen.length >= n) chosen.shift(); chosen.push(c); }
           row.querySelectorAll('.card').forEach((x, j) => x.classList.toggle('sel', chosen.includes(cards[j])));
@@ -548,9 +551,9 @@
       b.appendChild(row);
       const r = el('div', 'mrow');
       if (!o.view) ok.disabled = true;
-      ok.onclick = () => { m.hidden = true; $('#tip').hidden = true; res(o.view ? [] : chosen.slice()); };
+      ok.onclick = () => { m.hidden = true; detailOver(null); res(o.view ? [] : chosen.slice()); };
       r.appendChild(ok);
-      if (o.optional) { const sk = el('button', 'btn ghost', o.skipText || '跳過'); sk.onclick = () => { m.hidden = true; $('#tip').hidden = true; res([]); }; r.appendChild(sk); }
+      if (o.optional) { const sk = el('button', 'btn ghost', o.skipText || '跳過'); sk.onclick = () => { m.hidden = true; detailOver(null); res([]); }; r.appendChild(sk); }
       b.appendChild(r); m.hidden = false;
     });
   }
@@ -562,9 +565,10 @@
       const row = el('div', 'mcards'), cols = el('div', 'mrow');
       const ok = el('button', 'btn primary', '確定'); ok.disabled = true;
       const upd = () => { row.querySelectorAll('.card').forEach((x, j) => x.classList.toggle('sel', cards[j] === pick)); cols.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.c === color)); ok.disabled = !(pick && color); };
-      cards.forEach(c => { const e = cardEl(c.id); e.onclick = () => { pick = c; upd(); }; row.appendChild(e); });
+      detailOver(cards[0] && cards[0].id);
+      cards.forEach(c => { const e = cardEl(c.id); e.addEventListener('pointerenter', () => showDetail(c.id, true)); e.onclick = () => { pick = c; upd(); }; row.appendChild(e); });
       for (const c of ['F', 'W', 'G']) { const x = el('button', 'colorbtn ' + c, COLOR_NAME[c]); x.dataset.c = c; x.onclick = () => { color = c; upd(); }; cols.appendChild(x); }
-      ok.onclick = () => { m.hidden = true; res({ card: pick, color }); };
+      ok.onclick = () => { m.hidden = true; detailOver(null); res({ card: pick, color }); };
       b.append(row, el('p', '', '變成：'), cols, ok); m.hidden = false;
     });
   }

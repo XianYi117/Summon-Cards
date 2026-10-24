@@ -205,6 +205,8 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 
 /* 側欄 */
 .detail{position:absolute;left:14px;top:14px;width:222px;display:grid;gap:8px;background:#11151c;border:1px solid var(--line);border-radius:8px;padding:10px;transition:box-shadow .3s}
+.mcards .card:hover{outline:2px solid var(--gold-hi);outline-offset:2px;border-radius:6%}
+.detail.over{z-index:105;box-shadow:0 0 0 1px var(--gold-hi),0 0 30px #f1d49166}
 .detail.focus{box-shadow:0 0 0 1px var(--gold),0 0 24px #c9a45c44}
 .detail .card{--w:170px;justify-self:center}
 .detail .dn{font-family:var(--f-display);font-weight:900;font-size:17px}
@@ -222,7 +224,10 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .pl .ps b{color:var(--text);font-variant-numeric:tabular-nums}
 .pl .goal{font-size:12px;color:var(--gold-hi)}
 .pl.sealedL .card .shade{background:#3a1f6a88}
-.turnbox{position:absolute;right:14px;top:158px;width:216px;display:grid;gap:5px;justify-items:center;text-align:center}
+.rcol{position:absolute;right:14px;top:150px;bottom:160px;width:216px;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.rcol>*{pointer-events:auto}
+.turnbox{position:relative;display:grid;gap:5px;justify-items:center;text-align:center;flex:none}
+.netstate{position:absolute;top:-16px;left:0;right:0}
 .phase{font-family:var(--f-display);font-weight:900;font-size:18px;letter-spacing:.1em;color:var(--gold-hi)}
 .turnno{font-size:12px;color:var(--muted);letter-spacing:.2em}
 .tools{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;width:100%}.tools .btn{padding-left:0;padding-right:0;min-width:0}
@@ -246,12 +251,12 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .vs-hint{margin-top:10px;color:var(--muted);letter-spacing:.1em}
 .netstate{color:var(--gold-hi);font-size:12px;animation:blink 1.2s infinite alternate}
 @keyframes blink{from{opacity:.4}to{opacity:1}}
-.cheat{position:absolute;right:14px;top:282px;width:216px;background:#11151c;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px}
-.cheat h4{margin:0 0 4px;font-family:var(--f-display);font-size:13px;color:var(--gold-hi);letter-spacing:.1em;display:flex;justify-content:space-between;align-items:center}
+.cheat{position:relative;flex:none;box-sizing:border-box;width:100%;overflow:hidden;background:#11151c;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px}
+.cheat h4{flex-wrap:wrap;gap:0 6px;margin:0 0 4px;font-family:var(--f-display);font-size:13px;color:var(--gold-hi);letter-spacing:.1em;display:flex;justify-content:space-between;align-items:center}
 .cheat h4 small{font-family:var(--f-body);font-weight:400;color:var(--muted);font-size:11px;letter-spacing:0}
-.cheat table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-.cheat td{padding:1px 4px;line-height:1.35;border-bottom:1px solid #ffffff0d}
-.cheat td:nth-child(2),.cheat td:nth-child(3){text-align:center;width:34px}
+.cheat table{width:100%;table-layout:fixed;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.cheat td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:1px 3px;line-height:1.35;border-bottom:1px solid #ffffff0d}
+.cheat td:nth-child(2),.cheat td:nth-child(3){text-align:center;width:30px}.cheat td:first-child{letter-spacing:-.02em}
 .cheat tr.hd td{color:var(--muted);font-size:11px}
 .cheat tr.on td{background:#3a321b;color:var(--gold-hi);font-weight:700}
 .cheat .kz{margin-top:4px;line-height:1.5;color:var(--text)}
@@ -271,7 +276,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .pw.me{left:6px}.pw.foe{right:6px}
 .pw.me .num{color:var(--me)}.pw.foe .num{color:var(--foe)}
 .pw.won{box-shadow:0 0 0 1px var(--gold-hi),0 0 24px #f1d49166}
-.tip{position:absolute;z-index:80;pointer-events:none;background:#0b0e13f2;border:1px solid var(--gold);border-radius:6px;padding:8px 10px;font-size:12px;line-height:1.6;width:220px}
+.tip{position:absolute;z-index:110;pointer-events:none;background:#0b0e13f2;border:1px solid var(--gold);border-radius:6px;padding:8px 10px;font-size:12px;line-height:1.6;width:220px}
 .tip b{color:var(--gold-hi)}
 
 /* 彈窗 */
@@ -364,6 +369,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
       <div class="foe-hand" id="foeHand"></div>
       <div class="detail" id="detail"></div>
       <div class="side foe" id="sideFoe"></div>
+      <div class="rcol">
       <div class="turnbox">
         <div class="turnno" id="turnNo">回合 1</div>
         <div class="phase" id="phase">準備</div>
@@ -377,6 +383,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
         </div>
       </div>
       <div class="cheat" id="cheat"></div>
+      </div>
       <div class="side me" id="sideMe"></div>
       <div class="powers" id="powers"></div>
       <div class="banner" id="banner" hidden><div id="bannerText"></div></div>
