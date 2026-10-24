@@ -57,7 +57,7 @@
     renderNetPick();
     const grid = $('#leaderGrid'); grid.innerHTML = '';
     grid.classList.toggle('has-pick', !!s.leader);
-    const list = isFoe ? [...leaderIds, 'RANDOM'] : leaderIds;
+    const list = [...leaderIds, 'RANDOM'];
     for (const id of list) {
       const c = id === 'RANDOM' ? cardEl(null, { down: true }) : cardEl(id);
       c.tabIndex = 0; c.setAttribute('role', 'button');
@@ -103,10 +103,40 @@
     if (s.leader === 'L11' && !s.main) inf.appendChild(el('div', 'empty', '請選擇冥火貓妖的主色。'));
   }
   $('#pickBack').onclick = () => { if (net.on) { if (net.conn) net.send({ k: 'bye' }); net.close(); show('home'); return; } if (pickStep === 'foe') { pickStep = 'me'; renderPick(); } else show('home'); };
-  function finalizeCfg() {
-    const f = cfg.foe;
-    f.realLeader = f.leader === 'RANDOM' ? leaderIds[Math.floor(Math.random() * leaderIds.length)] : f.leader;
-    if (f.realLeader !== 'L11') delete f.main;
+  // 依牌組類型抽出 20 張（每色張數照設定，色內隨機）
+  function rollDeck(type) {
+    let comp = (DECKS[type] || DECKS.RND).comp;
+    if (!comp) comp = [DECKS.FW, DECKS.GF, DECKS.WG][Math.floor(Math.random() * 3)].comp;
+    const out = [];
+    for (const col of ['F', 'W', 'G']) {
+      const ids = Object.keys(CARDS).filter(id => id[0] === col).sort(() => Math.random() - .5);
+      out.push(...ids.slice(0, comp[col]).sort());
+    }
+    return out;
+  }
+  function resolveSide(s) {
+    s.realLeader = s.leader === 'RANDOM' ? leaderIds[Math.floor(Math.random() * leaderIds.length)] : s.leader;
+    if (s.realLeader !== 'L11') delete s.main;
+    else if (!s.main) s.main = ['F', 'W', 'G'][Math.floor(Math.random() * 3)];
+    s.cards = rollDeck(s.deck);
+  }
+  function finalizeCfg() { resolveSide(cfg.me); resolveSide(cfg.foe); }
+  // 查看牌組：依屬性列出 20 張
+  function openDeckView(cards, title) {
+    const m = $('#deckView'); m.innerHTML = '';
+    const box = el('div', 'dvbox');
+    const cnt = { F: 0, W: 0, G: 0 }; cards.forEach(id => cnt[id[0]]++);
+    box.appendChild(el('h3', '', `${title}<small>　火 ${cnt.F}．水 ${cnt.W}．草 ${cnt.G}，共 ${cards.length} 張</small>`));
+    const grid = el('div', 'dvgrid');
+    for (const id of cards) {
+      const d = CARDS[id], row = el('div', 'dvcard ' + id[0]);
+      row.appendChild(cardEl(id));
+      row.appendChild(el('div', 'dvtx', `<b>${id} ${d.name}</b><span><i>啟動</i>${d.act}</span><span><i>獻祭</i>${d.sac}</span>`));
+      grid.appendChild(row);
+    }
+    box.appendChild(grid);
+    const x = el('button', 'btn', '關閉'); x.onclick = () => { m.hidden = true; }; box.appendChild(x);
+    m.appendChild(box); m.hidden = false; m.onclick = e => { if (e.target === m) m.hidden = true; };
   }
   function renderVS() {
     const side = (box, s, who) => {
@@ -114,12 +144,15 @@
       const id = s.realLeader || s.leader;
       const c = cardEl(id); tilt(c, 10); box.appendChild(c);
       box.appendChild(el('div', 'nm', `${who}．${LEADERS[id].name}`));
-      box.appendChild(el('div', 'dk', `牌組：${DECKS[s.deck].label}${s.main ? `．宣告主色 <span class="ctag ${s.main}">${COLOR_NAME[s.main]}</span>` : ''}${s.leader === 'RANDOM' ? '．隨機隊長' : ''}`));
+      box.appendChild(el('div', 'dk', `牌組：${DECKS[s.deckType || s.deck].label}${s.main ? `．宣告主色 <span class="ctag ${s.main}">${COLOR_NAME[s.main]}</span>` : ''}${s.leader === 'RANDOM' || s.randLeader ? '．隨機隊長' : ''}`));
     };
     side($('#vsFoe'), cfg.foe, '對手'); side($('#vsMe'), cfg.me, '我方');
+    $('#vsReroll').hidden = net.on;
   }
   $('#vsBack').onclick = () => { pickStep = 'me'; renderPick(); show('pick'); };
   $('#vsStart').onclick = () => startBattle();
+  $('#vsDeck').onclick = () => openDeckView(cfg.me.cards || [], '我方牌組');
+  $('#vsReroll').onclick = () => { cfg.me.cards = rollDeck(cfg.me.deck); openDeckView(cfg.me.cards, '我方牌組（重新抽過）'); };
 
   // ---------- 規則 ----------
   function renderRules() {
@@ -186,7 +219,7 @@
 
   // ================= 對戰 =================
   let G = null, scale = 1, mode = 'idle', sel = [], fresh = new Set(), freshPlay = new Set(), freshStatue = new Set(), sacFx = new Set();
-  let lockCards = [null, null]; // 同時出牌：已鎖定但尚未翻開的牌
+  let lockCards = [null, null]; const sacTurn = new Set(); // 本回合獻祭的石像 // 同時出牌：已鎖定但尚未翻開的牌
   let ME = 0; const P = slot => slot === 0 ? ME : 1 - ME; // 畫面位置(0=我方) → 引擎玩家編號
   let resolver = null, pickables = null, revealed = false, lastSettle = null, logs = [], t0 = 0, tEnd = 0, clockT = null;
   const mmss = ms => { const t = Math.max(0, Math.floor(ms / 1000)); return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
@@ -201,7 +234,12 @@
   function relRect(e) { const s = stage.getBoundingClientRect(), r = e.getBoundingClientRect(); return { x: (r.left - s.left) / scale, y: (r.top - s.top) / scale, w: r.width / scale, h: r.height / scale }; }
 
   // 懸停說明
-  let tipTimer = null;
+  let tipTimer = null, focusOff = null, ovShow = null, ovHide = null;
+  // 彈窗中的卡：停 0.15 秒顯示詳細資訊，移開 0.5 秒後收起
+  function hoverOver(e, id) {
+    e.addEventListener('pointerenter', () => { clearTimeout(ovHide); clearTimeout(ovShow); ovShow = setTimeout(() => detailOver(id), 150); });
+    e.addEventListener('pointerleave', () => { clearTimeout(ovShow); clearTimeout(ovHide); ovHide = setTimeout(() => detailOver(null), 500); });
+  }
   function bindHover(c, id, extra) {
     c.addEventListener('pointerenter', e => {
       const t = $('#tip'); const d = info(id); if (!d) return;
@@ -209,9 +247,9 @@
       const r = relRect(c); let x = r.x + r.w + 8, y = r.y;
       if (x + 230 > 1280) x = r.x - 230; if (y + 120 > 720) y = 720 - 130; if (y < 0) y = 4;
       t.style.left = x + 'px'; t.style.top = y + 'px'; t.hidden = false;
-      clearTimeout(tipTimer); tipTimer = setTimeout(() => showDetail(id, true), 700);
+      clearTimeout(tipTimer); clearTimeout(focusOff); tipTimer = setTimeout(() => showDetail(id, true), 150);
     });
-    c.addEventListener('pointerleave', () => { $('#tip').hidden = true; clearTimeout(tipTimer); $('#detail').classList.remove('focus'); });
+    c.addEventListener('pointerleave', () => { $('#tip').hidden = true; clearTimeout(tipTimer); clearTimeout(focusOff); focusOff = setTimeout(() => $('#detail').classList.remove('focus'), 500); });
   }
   function showDetail(id, focus) {
     const d = $('#detail'); d.innerHTML = '';
@@ -234,11 +272,11 @@
       ME = 0; net.on = false;
       const me = cfg.me, foe = cfg.foe;
       G = new Game({
-        players: [{ leader: me.leader, deck: me.deck, main: me.main }, { leader: foe.realLeader, deck: foe.deck, main: foe.main }],
+        players: [{ leader: me.realLeader, deck: me.cards || me.deck, main: me.main }, { leader: foe.realLeader, deck: foe.cards || foe.deck, main: foe.main }],
         controllers: [lockFx(Human), lockFx(AI)], ui: { ev: onEvent, log: addLog },
       });
     }
-    $('#netState').hidden = true;
+    $('#netState').hidden = true; $('#deckView').hidden = true; sacTurn.clear();
     mode = 'idle'; sel = []; fresh = new Set(G.p[ME].hand.map(c => c.uid)); freshPlay.clear(); freshStatue.clear(); sacFx.clear(); revealed = false; lastSettle = null; logs = [];
     t0 = Date.now(); tEnd = 0; clearInterval(clockT); clockT = setInterval(tickClock, 1000); tickClock();
     $('#powers').innerHTML = ''; $('#modal').hidden = true; $('#fx').innerHTML = ''; effOpen = null;
@@ -260,8 +298,21 @@
     renderSide(0); renderSide(1); renderOrbs(); renderStatues(0); renderStatues(1); renderPlays(); renderHand(); renderFoeHand(); renderAct(); renderLive(); renderEff();
   }
   // 翻牌後到戰力計算前：即時顯示雙方目前戰力
+  // 明細標籤：卡號後面補上卡名（例：G01 → G01 森林信使）
+  const lab = l => l.replace(/\b([FWG]\d\d)\b/g, m => CARDS[m] ? `${m} ${CARDS[m].name}` : m);
+  const brkText = br => br.map(([l, v]) => `${lab(l)} ${v > 0 && l.indexOf('牌型') ? '+' : ''}${v}`).join('．');
   function renderLive() {
     const box = $('#powers');
+    if (mode === 'choose' && sel.length && !lastSettle) {
+      const [, cat] = shape(sel);
+      const ctx = { core: [null, null], cat: [cat, cat], bonus: [0, 0], immune: [false, false] };
+      ctx.bonus[ME] = G.ctx.bonus[ME]; ctx.core[ME] = G.lead(G.p[ME], 'L12') ? sel[0].id[0] : coreOf(sel, cat);
+      const x = G.power(ME, sel, ctx, true);
+      box.innerHTML = '';
+      const p = el('div', 'pw live me'); p.style.top = '352px';
+      p.innerHTML = `<div class="num">${x.total}</div><div class="brk"><b class="lv">預估戰力（不含剋制）</b><br>${brkText(x.br)}</div>`;
+      box.appendChild(p); return;
+    }
     const on = G.phase === 'post' && revealed && !lastSettle && G.played[0].length && G.played[1].length;
     if (!on) { if (box.querySelector('.pw.live')) box.innerHTML = ''; return; }
     const ev = G.evaluate(G.played, G.ctx, true);
@@ -270,7 +321,7 @@
       const idx = P(i);
       const p = el('div', 'pw live ' + (i === 0 ? 'me' : 'foe') + (ev.w === idx ? ' lead' : ''));
       p.style.top = (i === 0 ? 352 : 228) + 'px';
-      const brk = ev.br[idx].map(([l, v]) => `${l} ${v > 0 && l.indexOf('牌型') ? '+' : ''}${v}`).join('．');
+      const brk = brkText(ev.br[idx]);
       p.innerHTML = `<div class="num">${ev.pw[idx]}</div><div class="brk"><b class="lv">目前戰力${ev.w === idx ? '．領先' : ev.w === null ? '．平手' : ''}</b><br>${brk}</div>`;
       box.appendChild(p);
     }
@@ -282,7 +333,7 @@
     switch (p.leader) {
       case 'L01': return `連勝加成 +${p.l01}`;
       case 'L08': return `已獻祭石像 ${p.statues.filter(s => !s.up).length}／5`;
-      case 'L10': return `直立 火${c.F} 水${c.W} 草${c.G}（各 2）`;
+      case 'L10': return `直立 火${c.F}．水${c.W}．草${c.G}／各 2`;
       case 'L11': return `主色 <span class="ctag ${p.main}">${COLOR_NAME[p.main]}</span> 直立 ${c[p.main]}／4`;
       case 'L13': return `封印中 ${o.statues.filter(s => s.byL13).length}／4`;
     }
@@ -294,10 +345,10 @@
     const c = cardEl(p.leader); bindHover(c, p.leader, p.lsealed ? '<br><b>本回合被封印</b>' : ''); pl.appendChild(c);
     const g = goalText(p);
     pl.appendChild(el('div', '', `<div class="pn">${i === 0 ? '我方' : '對手'}．${LEADERS[p.leader].name}</div>
-      <div class="ps">得分 <b>${p.score}</b>／4<br>牌庫 <b>${p.deck.length}</b>．<button class="dlink" data-pile="${P(i)}" title="查看棄牌堆">棄牌 <b>${p.disc.length}</b></button>${i === 1 ? `．手牌 <b>${p.hand.length}</b>` : ''}</div>
+      <div class="ps">得分 <b>${p.score}</b>／4<br>牌庫 <b>${p.deck.length}</b>．棄牌 <b>${p.disc.length}</b>${i === 1 ? `．手牌 <b>${p.hand.length}</b>` : ''}</div>
       ${g ? `<div class="goal">${g}</div>` : ''}${p.lsealed ? '<div class="goal" style="color:#d9c2ff">隊長被封印</div>' : ''}`));
     box.appendChild(pl);
-    pl.querySelector('.dlink').onclick = e => openPile(+e.currentTarget.dataset.pile);
+    $(i === 0 ? '#pileMe' : '#pileFoe').innerHTML = `查看${i === 0 ? '我方' : '對手'}棄牌 <b>${p.disc.length}</b>`;
   }
   function renderOrbs() {
     for (const [i, box] of [[0, $('#orbsMe')], [1, $('#orbsFoe')]]) {
@@ -314,13 +365,15 @@
     const keep = el('div', 'st-keep'), sac = el('div', 'st-sac');
     keep.appendChild(el('span', 'zl', i === 0 ? '我方石像區' : '對手石像區'));
     sac.appendChild(el('span', 'zl', '獻祭區'));
-    const up = p.statues.filter(s => s.up), down = p.statues.filter(s => !s.up);
+    const up = p.statues.filter(s => s.up), down = [...p.statues.filter(s => !s.up && !sacTurn.has(s.uid)), ...p.statues.filter(s => !s.up && sacTurn.has(s.uid))];
+    sac.classList.toggle('hot', down.some(s => sacTurn.has(s.uid)));
     keep.classList.toggle('crowd', up.length > 7);
     for (const s of [...up, ...down]) {
       const c = cardEl(s.id, { uid: s.uid });
       if (s.sealed) c.classList.add('sealed'); if (s.maint) c.classList.add('maint');
       if (freshStatue.has(s.uid)) c.classList.add('petrify');
       if (sacFx.has(s.uid)) c.classList.add('sacfx');
+      if (!s.up && sacTurn.has(s.uid)) c.classList.add('justsac');
       if (pickables && pickables.list.includes(s)) { c.classList.add('pickable'); c.onclick = () => pickables && pickables.on(s); }
       const st = !s.up ? '<br><b>已獻祭</b>' : s.sealed ? '<br><b>封印中</b>' : s.maint ? '<br><b>維持雙界封印中</b>' : '';
       bindHover(c, s.id, st);
@@ -362,7 +415,7 @@
       e.onclick = () => {
         if (mode !== 'choose') return;
         const j = sel.indexOf(c); if (j >= 0) sel.splice(j, 1); else if (sel.length < 4) sel.push(c);
-        renderHand(); renderAct();
+        renderHand(); renderAct(); renderLive();
       };
       tilt(e, 16); bindHover(e, c.id); h.appendChild(e);
     });
@@ -372,42 +425,48 @@
     const h = $('#foeHand'); h.innerHTML = '';
     G.p[1 - ME].hand.forEach(() => h.appendChild(cardEl(null, { down: true })));
   }
-  // 效果一覽：雙方隊長、直立石像的啟動效果、本回合狀態
+  // 效果一覽：分成「啟動效果」與「獻祭效果」兩個按鈕，打開後同時列出雙方
   let effOpen = null;
-  function effList(idx) {
-    const p = G.p[idx], o = G.p[1 - idx], c = G.ctx, L = LEADERS[p.leader], out = [];
-    out.push({ t: 'lead', h: `隊長 ${L.name}`, d: L.text + (p.leader === 'L01' ? `（目前 +${p.l01}）` : '') + (p.leader === 'L11' ? `（主色 <span class="ctag ${p.main}">${COLOR_NAME[p.main]}</span>）` : ''), off: p.lsealed ? '本回合被封印' : '' });
-    if (c) {
-      if (c.bonus[idx]) out.push({ t: 'buff', h: '本回合', d: `戰力 ${c.bonus[idx] > 0 ? '+' : ''}${c.bonus[idx]}` });
-      if (c.immune[idx]) out.push({ t: 'buff', h: '本回合', d: '不受剋制' });
-      if (c.extraPt[idx]) out.push({ t: 'buff', h: '本回合', d: '獲勝時多得 1 分' });
-      if (c.blocked[idx]) out.push({ t: 'debuff', h: '本回合', d: '不能獻祭' });
+  const cname = id => `${id} ${CARDS[id].name}`;
+  function effList(idx, kind) {
+    const p = G.p[idx], c = G.ctx, L = LEADERS[p.leader], out = [];
+    if (kind === 'act') {
+      out.push({ t: 'lead', h: `${p.leader} ${L.name}（隊長）`, d: L.text + (p.leader === 'L01' ? `（目前 +${p.l01}）` : '') + (p.leader === 'L11' ? `（主色 <span class="ctag ${p.main}">${COLOR_NAME[p.main]}</span>）` : ''), off: p.lsealed ? '本回合被封印' : '' });
+      if (c) {
+        if (c.bonus[idx]) out.push({ t: 'buff', h: '本回合', d: `戰力 ${c.bonus[idx] > 0 ? '+' : ''}${c.bonus[idx]}` });
+        if (c.immune[idx]) out.push({ t: 'buff', h: '本回合', d: '不受剋制' });
+        if (c.extraPt[idx]) out.push({ t: 'buff', h: '本回合', d: '獲勝時多得 1 分' });
+      }
+      for (const s of p.statues.filter(x => x.up)) out.push({ t: 'st', id: s.id, h: cname(s.id), d: CARDS[s.id].act, off: s.sealed ? (s.byL13 ? '被雙界封印' : '封印中') : '', note: s.byL13 && !s.sealed ? '雙界封印暫時失效（封魔者被封印）' : '' });
+      if (!p.statues.some(x => x.up)) out.push({ t: 'info', h: '沒有直立石像', d: '' });
+    } else {
+      if (p.sacUsed) out.push({ t: 'debuff', h: '本回合', d: '已經獻祭過' });
+      if (c && c.blocked[idx]) out.push({ t: 'debuff', h: '本回合', d: '不能獻祭' });
+      for (const s of p.statues.filter(x => x.up)) out.push({ t: 'st', id: s.id, h: cname(s.id), d: CARDS[s.id].sac, off: s.sealed ? (s.byL13 ? '被雙界封印，不能獻祭' : '封印中，不能獻祭') : s.maint && !p.lsealed ? '維持雙界封印中，不能獻祭' : '' });
+      if (!p.statues.some(x => x.up)) out.push({ t: 'info', h: '沒有可獻祭的石像', d: '' });
+      const down = p.statues.filter(x => !x.up);
+      if (down.length) out.push({ t: 'info', h: `已獻祭 ${down.length} 座`, d: down.map(x => cname(x.id)).join('、') });
     }
-    if (p.sacUsed) out.push({ t: 'debuff', h: '本回合', d: '已經獻祭過' });
-    for (const s of p.statues.filter(x => x.up)) out.push({ t: 'st', id: s.id, h: CARDS[s.id].name, d: CARDS[s.id].act, off: s.sealed ? (s.byL13 ? '被雙界封印' : '封印中') : '', note: s.maint ? '維持雙界封印中，不能獻祭' : s.byL13 && !s.sealed ? '雙界封印暫時失效（封魔者被封印）' : '' });
-    const down = p.statues.filter(x => !x.up).length;
-    if (down) out.push({ t: 'info', h: '已獻祭石像', d: `${down} 座（沒有能力）` });
     return out;
   }
   function renderEff() {
-    for (const [slot, btn] of [[0, $('#effMe')], [1, $('#effFoe')]]) {
-      const n = effList(P(slot)).filter(e => !e.off && e.t !== 'info').length;
-      btn.innerHTML = `${slot === 0 ? '我方效果' : '對手效果'} <b>${n}</b>`;
-      btn.setAttribute('aria-pressed', effOpen === slot);
-    }
+    $('#effMe').setAttribute('aria-pressed', effOpen === 'act');
+    $('#effFoe').setAttribute('aria-pressed', effOpen === 'sac');
     const pn = $('#effPanel');
     pn.hidden = effOpen === null;
     if (effOpen === null) return;
     const col = slot => {
-      const items = effList(P(slot));
-      return `<div class="effcol ${slot === 0 ? 'me' : 'foe'}${effOpen === slot ? ' focus' : ''}"><h4>${slot === 0 ? '我方' : '對手'}</h4>${items.map(e => `<div class="eff ${e.t}${e.off ? ' off' : ''}"${e.id ? ` data-id="${e.id}"` : ''}><b>${e.h}</b>${e.d}${e.off ? `<em>${e.off}</em>` : ''}${e.note ? `<em>${e.note}</em>` : ''}</div>`).join('')}</div>`;
+      const items = effList(P(slot), effOpen);
+      return `<div class="effcol ${slot === 0 ? 'me' : 'foe'}"><h4>${slot === 0 ? '我方' : '對手'}</h4>${items.map(e => `<div class="eff ${e.t}${e.off ? ' off' : ''}"${e.id ? ` data-id="${e.id}"` : ''}><b>${e.h}</b>${e.d}${e.off ? `<em>${e.off}</em>` : ''}${e.note ? `<em>${e.note}</em>` : ''}</div>`).join('')}</div>`;
     };
-    pn.innerHTML = `<div class="effhd"><span>效果一覽</span><button class="btn ghost small" id="effX">關閉</button></div><div class="effcols">${col(0)}${col(1)}</div>`;
+    pn.innerHTML = `<div class="effhd"><span>${effOpen === 'act' ? '啟動效果一覽' : '獻祭效果一覽'}</span><button class="btn ghost small" id="effX">關閉</button></div><div class="effcols">${col(0)}${col(1)}</div>`;
     $('#effX').onclick = () => { effOpen = null; renderEff(); };
-    pn.querySelectorAll('.eff[data-id]').forEach(e => e.addEventListener('pointerenter', () => showDetail(e.dataset.id, true)));
+    pn.querySelectorAll('.eff[data-id]').forEach(e => { e.addEventListener('pointerenter', () => { clearTimeout(focusOff); showDetail(e.dataset.id, true); }); e.addEventListener('pointerleave', () => { focusOff = setTimeout(() => $('#detail').classList.remove('focus'), 500); }); });
   }
-  $('#effMe').onclick = () => { effOpen = effOpen === 0 ? null : 0; if (G) renderEff(); };
-  $('#effFoe').onclick = () => { effOpen = effOpen === 1 ? null : 1; if (G) renderEff(); };
+  $('#effMe').onclick = () => { effOpen = effOpen === 'act' ? null : 'act'; if (G) renderEff(); };
+  $('#effFoe').onclick = () => { effOpen = effOpen === 'sac' ? null : 'sac'; if (G) renderEff(); };
+  $('#pileMe').onclick = () => { if (G) openPile(ME); };
+  $('#pileFoe').onclick = () => { if (G) openPile(1 - ME); };
   function renderCheat(name) {
     const l12 = G.lead(G.p[ME], 'L12');
     const rows = l12
@@ -437,7 +496,7 @@
       sac.title = sac.disabled ? (G.p[ME].sacUsed ? '本回合已經獻祭過' : G.ctx && G.ctx.blocked[ME] ? '本回合被封鎖，不能獻祭' : '沒有可以獻祭的石像') : '';
       sac.onclick = () => humanPreSac();
       if (!sac.disabled && (!resolver || (net.on && (net.sacQ.length || net.sacBusy)))) sac.disabled = true;
-      const clr = el('button', 'btn ghost', '清除'); clr.disabled = !sel.length; clr.onclick = () => { sel = []; renderHand(); renderAct(); };
+      const clr = el('button', 'btn ghost', '清除'); clr.disabled = !sel.length; clr.onclick = () => { sel = []; renderHand(); renderAct(); renderLive(); };
       a.append(go, sac, clr);
     } else if (mode === 'post') {
       a.appendChild(el('div', 'preview', '點選發光的石像來獻祭，或按跳過'));
@@ -482,7 +541,7 @@
   async function onEvent(name, d) {
     switch (name) {
       case 'turnStart':
-        lockCards = [null, null]; revealed = false; lastSettle = null; $('#powers').innerHTML = ''; renderAll();
+        sacTurn.clear(); lockCards = [null, null]; revealed = false; lastSettle = null; $('#powers').innerHTML = ''; renderAll();
         await banner(`第 ${d.turn} 回合．${who(d.first)}先`, 900); break;
       case 'draw':
         if (d.i === ME) d.cards.forEach(c => fresh.add(c.uid));
@@ -494,10 +553,10 @@
         break;
       case 'seal': renderAll(); await wait(450); break;
       case 'sacrifice':
-        sacFx.add(d.statue.uid); renderAll(); flashStatue(d.statue.uid);
+        sacTurn.add(d.statue.uid); sacFx.add(d.statue.uid); renderAll(); flashStatue(d.statue.uid);
         await banner(`${who(d.i)}獻祭 ${CARDS[d.statue.id].name}：${CARDS[d.statue.id].sac}`, 1100); sacFx.delete(d.statue.uid); break;
       case 'counter':
-        sacFx.add(d.statue.uid); renderAll(); flashStatue(d.statue.uid);
+        sacTurn.add(d.statue.uid); sacFx.add(d.statue.uid); renderAll(); flashStatue(d.statue.uid);
         await banner(`${who(d.i)}反擊！${CARDS[d.target.id].name} 的效果無效`, 1200); sacFx.delete(d.statue.uid); break;
       case 'destroy': shatter(d.statue.uid, true); await wait(250); renderAll(); await wait(550); break;
       case 'reveal':
@@ -520,7 +579,7 @@
     for (const i of [1, 0]) {
       const p = el('div', 'pw ' + (i === 0 ? 'me' : 'foe') + (d.w === P(i) ? ' won' : ''));
       p.style.top = (i === 0 ? 352 : 228) + 'px';
-      const brk = d.br[P(i)].map(([l, v]) => `${l} ${v > 0 && l.indexOf('牌型') ? '+' : ''}${v}`).join('．');
+      const brk = brkText(d.br[P(i)]);
       p.innerHTML = `<div class="num">0</div><div class="brk">${brk}</div>`;
       box.appendChild(p);
       const numEl = p.querySelector('.num'); const target = d.pw[P(i)];
@@ -560,8 +619,7 @@
     b.appendChild(el('h3', '', `${idx === ME ? '我方' : '對手'}棄牌堆<small class="lgt">　共 ${p.disc.length} 張．1 是最上面那張</small>`));
     const row = el('div', 'mcards pile');
     const list = p.disc.slice().reverse();
-    detailOver(list[0] && list[0].id);
-    list.forEach((c, k) => { const w = el('div', 'pcard'); const e = cardEl(c.id); e.addEventListener('pointerenter', () => showDetail(c.id, true)); w.append(el('span', 'pno', k + 1), e); row.appendChild(w); });
+    list.forEach((c, k) => { const w = el('div', 'pcard'); const e = cardEl(c.id); hoverOver(e, c.id); w.append(el('span', 'pno', k + 1), e); row.appendChild(w); });
     if (!list.length) row.appendChild(el('p', '', '棄牌堆是空的'));
     b.appendChild(row);
     const x = el('button', 'btn small', '關閉'); x.onclick = () => { m.hidden = true; detailOver(null); }; b.appendChild(x);
@@ -606,7 +664,7 @@
 
   // ---------- 彈窗選擇 ----------
   // 彈窗看牌時，左上詳細資訊浮到遮罩上方一起顯示
-  function detailOver(id) { const d = $('#detail'); $('#tip').hidden = true; if (id) { showDetail(id, true); d.classList.add('over'); } else d.classList.remove('over', 'focus'); }
+  function detailOver(id) { const d = $('#detail'); $('#tip').hidden = true; if (id) { clearTimeout(ovHide); showDetail(id, true); d.classList.add('over'); } else { clearTimeout(ovShow); d.classList.remove('over', 'focus'); } }
   function modalCards(title, cards, o = {}) {
     return new Promise(res => {
       const m = $('#modal'), b = $('#mbox'); b.innerHTML = '';
@@ -615,9 +673,8 @@
       const row = el('div', 'mcards'); const chosen = [];
       const n = o.n || 1;
       const ok = el('button', 'btn primary', o.view ? '知道了' : o.okText || '確定');
-      detailOver(cards[0] && cards[0].id);
       cards.forEach(c => {
-        const id = c.id; const e = cardEl(id); e.addEventListener('pointerenter', () => showDetail(id, true));
+        const id = c.id; const e = cardEl(id); hoverOver(e, id);
         if (!o.view) e.onclick = () => {
           const k = chosen.indexOf(c); if (k >= 0) chosen.splice(k, 1); else { if (chosen.length >= n) chosen.shift(); chosen.push(c); }
           row.querySelectorAll('.card').forEach((x, j) => x.classList.toggle('sel', chosen.includes(cards[j])));
@@ -642,8 +699,7 @@
       const row = el('div', 'mcards'), cols = el('div', 'mrow');
       const ok = el('button', 'btn primary', '確定'); ok.disabled = true;
       const upd = () => { row.querySelectorAll('.card').forEach((x, j) => x.classList.toggle('sel', cards[j] === pick)); cols.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.c === color)); ok.disabled = !(pick && color); };
-      detailOver(cards[0] && cards[0].id);
-      cards.forEach(c => { const e = cardEl(c.id); e.addEventListener('pointerenter', () => showDetail(c.id, true)); e.onclick = () => { pick = c; upd(); }; row.appendChild(e); });
+      cards.forEach(c => { const e = cardEl(c.id); hoverOver(e, c.id); e.onclick = () => { pick = c; upd(); }; row.appendChild(e); });
       for (const c of ['F', 'W', 'G']) { const x = el('button', 'colorbtn ' + c, COLOR_NAME[c]); x.dataset.c = c; x.onclick = () => { color = c; upd(); }; cols.appendChild(x); }
       ok.onclick = () => { m.hidden = true; detailOver(null); res({ card: pick, color }); };
       b.append(row, el('p', '', '變成：'), cols, ok); m.hidden = false;
@@ -786,7 +842,8 @@
     },
     toPick() { this.myCfg = null; cfg = { me: {}, foe: {} }; pickStep = 'me'; renderPick(); show('pick'); renderNetPick(); },
     ready() {
-      const s = cfg.me; this.myCfg = { leader: s.leader, deck: s.deck, main: s.leader === 'L11' ? s.main : undefined };
+      const s = cfg.me; resolveSide(s);
+      this.myCfg = { leader: s.realLeader, deck: s.cards, deckType: s.deck, main: s.realLeader === 'L11' ? s.main : undefined, randLeader: s.leader === 'RANDOM' };
       this.send({ k: 'cfg', cfg: this.myCfg }); renderNetPick();
       if (this.host) this.tryStart();
     },
@@ -798,11 +855,18 @@
     beginGame(m) {
       this.game = m.game; this.resetGame();
       const me = this.host ? 0 : 1;
-      cfg = { me: { ...m.cfgs[me] }, foe: { ...m.cfgs[1 - me], realLeader: m.cfgs[1 - me].leader } };
+      cfg = { me: { ...m.cfgs[me], realLeader: m.cfgs[me].leader, cards: m.cfgs[me].deck }, foe: { ...m.cfgs[1 - me], realLeader: m.cfgs[1 - me].leader } };
       this.myCfg = null; this.peerCfg = null;
       renderVS(); show('vs'); $('#vsStart').hidden = true; $('#vsBack').hidden = true;
       $('#vsHint').hidden = false;
-      setTimeout(() => { if (!this.on) return; $('#vsStart').hidden = false; $('#vsBack').hidden = false; $('#vsHint').hidden = true; startBattle({ me, seed: m.seed, cfgs: m.cfgs }); }, 2600);
+      let left = 10; $('#vsHint').textContent = `對戰將在 ${left} 秒後開始，可以先查看自己的牌組`;
+      const tick = setInterval(() => {
+        if (!this.on) { clearInterval(tick); return; }
+        left--; $('#vsHint').textContent = `對戰將在 ${left} 秒後開始，可以先查看自己的牌組`;
+        if (left > 0) return;
+        clearInterval(tick); $('#vsStart').hidden = false; $('#vsBack').hidden = false; $('#vsHint').hidden = true;
+        startBattle({ me, seed: m.seed, cfgs: m.cfgs.map(c => ({ leader: c.leader, deck: c.deck, main: c.main })) });
+      }, 1000);
     },
   };
   function loadPeer() {

@@ -47,6 +47,7 @@
   const COPYABLE = id => id !== 'G07' && !COUNTERS.includes(id);
 
   function buildDeck(type) {
+    if (Array.isArray(type)) return shuffle(type.map(id => ({ uid: UID++, id })));
     let comp = (DECKS[type] || DECKS.RND).comp;
     if (!comp) comp = [DECKS.FW, DECKS.GF, DECKS.WG][rnd(3)].comp;
     const deck = [];
