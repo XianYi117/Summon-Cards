@@ -614,14 +614,14 @@
       if (o.sub) b.appendChild(el('p', '', o.sub));
       const row = el('div', 'mcards'); const chosen = [];
       const n = o.n || 1;
-      const ok = el('button', 'btn primary', o.view ? '知道了' : '確定');
+      const ok = el('button', 'btn primary', o.view ? '知道了' : o.okText || '確定');
       detailOver(cards[0] && cards[0].id);
       cards.forEach(c => {
         const id = c.id; const e = cardEl(id); e.addEventListener('pointerenter', () => showDetail(id, true));
         if (!o.view) e.onclick = () => {
           const k = chosen.indexOf(c); if (k >= 0) chosen.splice(k, 1); else { if (chosen.length >= n) chosen.shift(); chosen.push(c); }
           row.querySelectorAll('.card').forEach((x, j) => x.classList.toggle('sel', chosen.includes(cards[j])));
-          ok.disabled = chosen.length !== Math.min(n, cards.length);
+          ok.disabled = o.upTo ? !chosen.length : chosen.length !== Math.min(n, cards.length);
         };
         row.appendChild(e);
       });
@@ -700,7 +700,7 @@
         case 'tutor': return modalCards(o.title, o.cards, { n: 1 });
         case 'discardOne': return modalCards(o.title, o.cards, { n: 1 });
         case 'swap': return modalCards(o.title, o.cards, { n: 1 });
-        case 'l02': return modalCards(o.title, o.cards, { n: 1, optional: true, skipText: '不交換' });
+        case 'l02': return modalCards(o.title, o.cards, { n: 2, upTo: true, okText: '放回牌庫底', skipText: '不放回' , optional: true });
         case 'destroy': case 'seal': case 'copy': { const s = await boardPick(o.statues, o.title + '：點選場上發光的石像'); return s ? [s] : []; }
         case 'g08': return modalG08(o.cards);
         case 'l13': {

@@ -150,6 +150,12 @@
       const order = [this.first, 1 - this.first];
       for (const i of order) {
         const p = this.p[i]; const cap = this.lead(p, 'L09') ? 6 : 5;
+        // L02 潮汐交換：【補牌】時，0～2 張手牌放回牌庫底，再補滿手牌
+        if (this.lead(p, 'L02') && p.hand.length) {
+          const back = ((await this.ctrl[i].pick(this, i, 'l02', { cards: p.hand.slice(), n: 2, title: 'L02 潮汐交換：選 0～2 張手牌放回牌庫底，之後補滿手牌' })) || []).filter(c => p.hand.includes(c)).slice(0, 2);
+          for (const c of back) { p.hand.splice(p.hand.indexOf(c), 1); p.deck.unshift(c); }
+          if (back.length) { this.note(`潮汐交換：${back.length} 張手牌放回牌庫底`, i); await this.ui.ev('discard', { i, cards: [] }); }
+        }
         if (p.hand.length < cap) await this.draw(i, cap - p.hand.length);
       }
       for (const i of order) {
@@ -172,16 +178,6 @@
       // 出牌前能力
       for (const i of order) {
         const p = this.p[i], o = this.opp(i);
-        if (this.lead(p, 'L02') && p.hand.length) {
-          const c = await this.ctrl[i].pick(this, i, 'l02', { cards: p.hand.slice(), n: 1, optional: true, title: 'L02 潮汐交換：選 1 張手牌與牌庫頂交換（可跳過）' });
-          if (c && c.length) {
-            if (!p.deck.length && p.disc.length) { p.deck = shuffle(p.disc); p.disc = []; }
-            if (p.deck.length) {
-              const x = c[0]; p.hand.splice(p.hand.indexOf(x), 1); const top = p.deck.pop(); p.deck.push(x); p.hand.push(top);
-              this.note('潮汐交換：1 張手牌與牌庫頂交換', i); await this.ui.ev('draw', { i, cards: [top] });
-            }
-          }
-        }
         const peeks = (this.lead(p, 'L07') ? 1 : 0) + this.count(p, 'W06');
         if (peeks && o.hand.length) await this.peek(i, 2);
       }
@@ -581,7 +577,7 @@
         case 'retrieve': return o.cards.sort((a, b) => cval(b.id) - cval(a.id)).slice(0, o.n);
         case 'tutor': return [o.cards.sort((a, b) => fit(b) - fit(a))[0]];
         case 'discardOne': case 'swap': return [o.cards.sort((a, b) => fit(a) - fit(b))[0]];
-        case 'l02': { const w = o.cards.sort((a, b) => fit(a) - fit(b))[0]; return fit(w) < 1.2 ? [w] : []; }
+        case 'l02': return o.cards.slice().sort((a, b) => fit(a) - fit(b)).filter(c => fit(c) < 1.2).slice(0, 2);
         case 'destroy': case 'seal': {
           const v = s => (STATIC_VAL[s.id] || .3) * (s.sealed ? 0 : 1) + (opp.leader === 'L11' && s.id[0] === opp.main ? 1.5 : 0) + (opp.leader === 'L10' ? .8 : 0) + (s.maint ? 1.2 : 0) - (['F06', 'G09'].includes(s.id) ? .4 : 0);
           return [o.statues.sort((a, b) => v(b) - v(a))[0]];

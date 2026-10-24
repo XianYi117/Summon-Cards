@@ -35,7 +35,7 @@ for (const id in CARDS) { CARDS[id].id = id; CARDS[id].color = id[0]; }
 
 const LEADERS = {
   L01: { name: '烈焰統帥', color: 'F', race: '龍', skill: '絕對勝利', text: '每贏 1 回合戰力 +1，輸了歸零' },
-  L02: { name: '深海智者', color: 'W', race: '魚', skill: '潮汐交換', text: '出牌前：手牌與牌庫頂換 1 張' },
+  L02: { name: '深海智者', color: 'W', race: '魚', skill: '潮汐交換', text: '【補牌】時，手牌 0～2 張放回牌庫底，並補滿手牌' },
   L03: { name: '森林守望者', color: 'G', race: '精靈', skill: '森林之力', text: '核心為草：戰力 +1' },
   L04: { name: '烈火守望者', color: 'F', race: '元素', skill: '烈火之力', text: '核心為火：戰力 +1' },
   L05: { name: '深海守望者', color: 'W', race: '海', skill: '深海之力', text: '核心為水：戰力 +1' },
