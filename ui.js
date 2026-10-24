@@ -571,7 +571,16 @@
         await wait(650); renderAll(); break;
       case 'pass': if (d.i !== ME) await banner('對手跳過', 600); break;
       case 'g08': renderAll(); await wait(500); break;
-      case 'settle': await showSettle(d); break;
+      case 'settle': {
+        // 對局紀錄：在戰力那一行補上雙方出牌與戰力明細
+        const last = logs[logs.length - 1];
+        if (last && last.text.startsWith('戰力')) last.detail = [0, 1].map(slot => {
+          const idx = P(slot), cards = G.played[idx];
+          const adv = d.adv && d.adv[idx];
+          return { who: slot, text: `${slot === 0 ? '我方' : '對手'} ${d.pw[idx]}：出 ${cards.map(c => cname(c.id) + (c.as ? `（視為${COLOR_NAME[c.as]}）` : '')).join('、')}<br>　＝ ${brkText(d.br[idx])}${adv ? '' : ''}` };
+        });
+        await showSettle(d); break;
+      }
       case 'summon':
         d.statues.forEach(s => freshStatue.add(s.uid));
         G.played[d.i] = []; renderAll(); await wait(d.statues.length ? 950 : 250); break;
@@ -634,7 +643,7 @@
     const m = $('#modal'), b = $('#mbox'); b.innerHTML = '';
     b.appendChild(el('h3', '', `對局紀錄<small class="lgt">　${tEnd ? '總用時' : '已進行'} ${mmss((tEnd || Date.now()) - t0)}</small>`));
     const box = el('div', 'logbox');
-    logs.slice().reverse().forEach(l => box.appendChild(el('p', l.who === 0 ? 'me' : l.who === 1 ? 'foe' : '', `<i class="ts">${mmss(l.t)}</i>回合 ${l.turn}．${l.who === 0 ? '我方' : l.who === 1 ? '對手' : ''} ${l.text}`)));
+    logs.slice().reverse().forEach(l => box.appendChild(el('p', l.who === 0 ? 'me' : l.who === 1 ? 'foe' : '', `<i class="ts">${mmss(l.t)}</i>回合 ${l.turn}．${l.who === 0 ? '我方' : l.who === 1 ? '對手' : ''} ${l.text}${l.detail ? `<span class="lgd">${l.detail.map(x => `<span class="${x.who === 0 ? 'me' : 'foe'}">${x.text}</span>`).join('')}</span>` : ''}`)));
     if (!logs.length) box.appendChild(el('p', '', '還沒有紀錄'));
     b.appendChild(box);
     const x = el('button', 'btn small', '關閉'); x.onclick = () => { m.hidden = true; if (after) after(); }; b.appendChild(x);
