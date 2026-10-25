@@ -152,13 +152,17 @@
       const order = [this.first, 1 - this.first];
       for (const i of order) {
         const p = this.p[i]; const cap = this.lead(p, 'L09') ? 6 : 5;
-        // L02 潮汐交換：【補牌】時，0～2 張手牌放回牌庫底，再補滿手牌
-        if (this.lead(p, 'L02') && p.hand.length) {
-          const back = ((await this.ctrl[i].pick(this, i, 'l02', { cards: p.hand.slice(), n: 2, title: 'L02 潮汐交換：選 0～2 張手牌放回牌庫底，之後補滿手牌' })) || []).filter(c => p.hand.includes(c)).slice(0, 2);
-          for (const c of back) { p.hand.splice(p.hand.indexOf(c), 1); p.deck.unshift(c); }
-          if (back.length) { this.note(`潮汐交換：${back.length} 張手牌放回牌庫底`, i); await this.ui.ev('discard', { i, cards: [] }); }
-        }
+        // 先補滿手牌
         if (p.hand.length < cap) await this.draw(i, cap - p.hand.length);
+        // L02 潮汐交換：補牌後，0～2 張手牌放回牌庫底，再補滿手牌
+        if (this.lead(p, 'L02') && p.hand.length) {
+          const back = ((await this.ctrl[i].pick(this, i, 'l02', { cards: p.hand.slice(), n: 2, title: 'L02 潮汐交換：選 0～2 張手牌放回牌庫底，再補滿手牌' })) || []).filter(c => p.hand.includes(c)).slice(0, 2);
+          for (const c of back) { p.hand.splice(p.hand.indexOf(c), 1); p.deck.unshift(c); }
+          if (back.length) {
+            this.note(`潮汐交換：${back.length} 張手牌放回牌庫底，再補滿手牌`, i); await this.ui.ev('discard', { i, cards: [] });
+            if (p.hand.length < cap) await this.draw(i, cap - p.hand.length);
+          }
+        }
       }
       for (const i of order) {
         const p = this.p[i], o = this.opp(i);
