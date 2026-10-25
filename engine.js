@@ -83,10 +83,11 @@
     upright(p) { return p.statues.filter(s => s.up); }
     count(p, id) { return this.active(p).filter(s => s.id === id).length; }
     lead(p, code) { return p.leader === code && !p.lsealed; }
-    canSacList(i) {
+    canSacList(i, phase) {
       const p = this.p[i];
       if (p.sacUsed || (this.ctx && this.ctx.blocked[i])) return [];
-      return p.statues.filter(s => s.up && !s.sealed && !(s.maint && !p.lsealed));
+      // G08 變換出戰牌屬性：翻牌後才有出戰牌，出牌階段不能獻祭
+      return p.statues.filter(s => s.up && !s.sealed && !(s.maint && !p.lsealed) && !(phase === 'pre' && s.id === 'G08'));
     }
 
     // ---------- 抽牌 ----------
@@ -303,7 +304,7 @@
     async _sacrifice(i, st, phase) {
       const p = this.p[i];
       if (this.winner !== null) return false;
-      if (!this.canSacList(i).includes(st)) return false;
+      if (!this.canSacList(i, phase).includes(st)) return false;
       st.up = false; p.sacUsed = true;
       this.note(`獻祭 ${CARDS[st.id].name}：${CARDS[st.id].sac}`, i);
       await this.ui.ev('sacrifice', { i, statue: st });
@@ -518,7 +519,7 @@
       return AI.bestPlay(g, i);
     },
     async preSac(g, i) {
-      const o = g.opp(i); const opts = g.canSacList(i); if (!opts.length) return;
+      const o = g.opp(i); const opts = g.canSacList(i, 'pre'); if (!opts.length) return;
       const by = id => opts.find(s => s.id === id);
       const threat = AI.threat(g, 1 - i);
       let st = null;

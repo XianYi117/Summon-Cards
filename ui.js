@@ -459,7 +459,7 @@
     } else {
       if (p.sacUsed) out.push({ t: 'debuff', h: '本回合', d: '已經獻祭過' });
       if (c && c.blocked[idx]) out.push({ t: 'debuff', h: '本回合', d: '不能獻祭' });
-      for (const s of p.statues.filter(x => x.up)) out.push({ t: 'st', id: s.id, h: cname(s.id), d: CARDS[s.id].sac, off: s.sealed ? (s.byL13 ? '被雙界封印，不能獻祭' : '封印中，不能獻祭') : s.maint && !p.lsealed ? '維持雙界封印中，不能獻祭' : '' });
+      for (const s of p.statues.filter(x => x.up)) out.push({ t: 'st', id: s.id, h: cname(s.id), d: CARDS[s.id].sac, off: s.sealed ? (s.byL13 ? '被雙界封印，不能獻祭' : '封印中，不能獻祭') : s.maint && !p.lsealed ? '維持雙界封印中，不能獻祭' : '', note: s.id === 'G08' ? '翻牌後才能獻祭' : '' });
       if (!p.statues.some(x => x.up)) out.push({ t: 'info', h: '沒有可獻祭的石像', d: '' });
       const down = p.statues.filter(x => !x.up);
       if (down.length) out.push({ t: 'info', h: `已獻祭 ${down.length} 座`, d: down.map(x => cname(x.id)).join('、') });
@@ -510,8 +510,8 @@
       } else a.appendChild(el('div', 'preview', '點選 1～4 張手牌，點選順序就是由左到右的排列'));
       const go = el('button', 'btn primary', '出牌'); go.disabled = !sel.length;
       go.onclick = () => { if (!resolver || mode !== 'choose') return; const r = resolver; resolver = null; mode = 'wait'; const s = sel.slice(); sel = []; lockCards[ME] = s; renderAll(); r(s); };
-      const sac = el('button', 'btn', '發動（獻祭）'); sac.disabled = !G.canSacList(ME).length;
-      sac.title = sac.disabled ? (G.p[ME].sacUsed ? '本回合已經獻祭過' : G.ctx && G.ctx.blocked[ME] ? '本回合被封鎖，不能獻祭' : '沒有可以獻祭的石像') : '';
+      const sac = el('button', 'btn', '發動（獻祭）'); sac.disabled = !G.canSacList(ME, 'pre').length;
+      sac.title = sac.disabled ? (G.p[ME].sacUsed ? '本回合已經獻祭過' : G.ctx && G.ctx.blocked[ME] ? '本回合被封鎖，不能獻祭' : G.canSacList(ME).length ? 'G08 要翻牌後才能獻祭' : '沒有可以獻祭的石像') : '';
       sac.onclick = () => humanPreSac();
       if (!sac.disabled && (!resolver || (net.on && (net.sacQ.length || net.sacBusy)))) sac.disabled = true;
       const clr = el('button', 'btn ghost', '清除'); clr.disabled = !sel.length; clr.onclick = () => { sel = []; renderHand(); renderAct(); renderLive(); };
@@ -524,7 +524,7 @@
       a.appendChild(el('div', 'preview', '點選場上發光的石像'));
       if (boardSkip) { const sk = el('button', 'btn', '不反擊'); sk.onclick = () => boardSkip(); a.appendChild(sk); }
     } else if (mode === 'presac') {
-      a.appendChild(el('div', 'preview', '點選要獻祭的石像'));
+      a.appendChild(el('div', 'preview', '點選要獻祭的石像' + (G.canSacList(ME).some(s => s.id === 'G08') ? '<br><small>G08 花冠幻術師要等翻牌後的獻祭時間才能用</small>' : '')));
       const back = el('button', 'btn ghost', '取消'); back.onclick = () => { pickables = null; mode = 'choose'; renderAll(); };
       a.appendChild(back);
     }
@@ -755,7 +755,7 @@
   let boardSkip = null;
   async function humanPreSac() {
     if (mode !== 'choose' || !resolver) return;
-    const list = G.canSacList(ME); if (!list.length) return;
+    const list = G.canSacList(ME, 'pre'); if (!list.length) return;
     mode = 'presac';
     pickables = { list, on: async st => {
       if (mode !== 'presac' || !resolver) return;
