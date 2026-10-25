@@ -28,7 +28,7 @@ const CARDS = {
   G05: { name: '古樹守護者', race: '人馬', act: '對手戰力 -1', sac: '封印對手隊長（本回合）', role: '隊長封印' },
   G06: { name: '孢子收藏家', race: '菌', act: '對手額外抽牌時 -1 張', sac: '本回合對手獻祭無效', role: '抽牌封鎖' },
   G07: { name: '泥沼氣', race: '毒', act: 'AAA 戰力 +2', sac: '複製 1 次直立、未封印石像的獻祭效果', role: '複製' },
-  G08: { name: '花冠幻術師', race: '神', act: 'AAAA 戰力 +3', sac: '變換 1 張自己出戰牌的屬性', role: '四連／變換' },
+  G08: { name: '花冠幻術師', race: '神', act: 'AAAA 戰力 +3', sac: '變換 1 張手牌或出戰牌的屬性', role: '四連／變換' },
   G09: { name: '修復者', race: '妖', act: '石像被破壞時抽 2', sac: '看對手 2 張手牌', role: '破壞補償' },
 };
 for (const id in CARDS) { CARDS[id].id = id; CARDS[id].color = id[0]; }
@@ -39,7 +39,7 @@ const LEADERS = {
   L03: { name: '森林守望者', color: 'G', race: '精靈', skill: '森林之力', text: '核心為草：戰力 +1' },
   L04: { name: '烈火守望者', color: 'F', race: '元素', skill: '烈火之力', text: '核心為火：戰力 +1' },
   L05: { name: '深海守望者', color: 'W', race: '海', skill: '深海之力', text: '核心為水：戰力 +1' },
-  L06: { name: '雙生指揮官', color: 'N', race: '雙生妖魔', skill: '雙生共鳴', text: '每組對子：戰力 +1' },
+  L06: { name: '雙生指揮官', color: 'N', race: '雙生妖魔', skill: '雙生共鳴', text: '當有 AA 牌型時，戰力 +1（AAB、AABC、AABB 也算，都只 +1）' },
   L07: { name: '暗影偵察者', color: 'N', race: '影', skill: '暗中窺探', text: '出牌前：看對手 2 張手牌' },
   L08: { name: '無冕暴君', color: 'N', race: '魔', skill: '孤家寡人', text: '5 座已獻祭石像：獲勝' },
   L09: { name: '豐饒掌管者', color: 'N', race: '矮靈', skill: '餘裕之手', text: '【補牌】補至 6 張' },

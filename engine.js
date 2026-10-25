@@ -37,7 +37,7 @@
     const main = coreOf(cards, cat);
     return [cards.find(c => colorOf(c) === main)];
   }
-  const pairsCount = name => ({ AA: 1, AAB: 1, AABC: 1, AABB: 2 }[name] || 0);
+  const pairsCount = name => ({ AA: 1, AAB: 1, AABC: 1, AABB: 1 }[name] || 0); // L06：有對子就 +1，AABB 也只 +1
 
   // AI 評估值
   const STATIC_VAL = { F01: 1, W09: 1, F04: .7, W05: .7, G03: .6, W03: .9, G05: .9, F07: .6, W07: .6, F05: .4, G01: .4, F03: .3, W04: .3, G02: .4, G07: .4, G08: .3, F08: .5, F02: .7, G04: .7, W01: .6, W02: .8, W08: .8, F09: .3, G06: .3, F06: .3, G09: .3, W06: .1 };
@@ -86,8 +86,7 @@
     canSacList(i, phase) {
       const p = this.p[i];
       if (p.sacUsed || (this.ctx && this.ctx.blocked[i])) return [];
-      // G08 變換出戰牌屬性：翻牌後才有出戰牌，出牌階段不能獻祭
-      return p.statues.filter(s => s.up && !s.sealed && !(s.maint && !p.lsealed) && !(phase === 'pre' && s.id === 'G08'));
+      return p.statues.filter(s => s.up && !s.sealed && !(s.maint && !p.lsealed));
     }
 
     // ---------- 抽牌 ----------
@@ -244,7 +243,7 @@
       if (this.lead(p, 'L03') && core === 'G') add('L03 森林之力', 1);
       if (this.lead(p, 'L04') && core === 'F') add('L04 烈火之力', 1);
       if (this.lead(p, 'L05') && core === 'W') add('L05 深海之力', 1);
-      if (this.lead(p, 'L06')) add('L06 雙生共鳴', pairsCount(name));
+      if (this.lead(p, 'L06')) add('L06 雙生共鳴', Math.min(1, pairsCount(name))); // 有成對（AA、AAB、AABC、AABB）就 +1
       if (this.lead(p, 'L11') && this.upright(p).filter(s => s.id[0] === p.main).length >= 2) add('L11 主色號令', 2);
       const upP = this.upright(p).length, upO = this.upright(o).length;
       for (const s of this.active(p)) {
@@ -368,7 +367,7 @@
         case 'G05': o.lsealed = true; this.syncL13(); this.note('封印對手隊長到回合結束', i); await this.ui.ev('seal', { i }); break;
         case 'G07': {
           const tg = [...this.p[i].statues, ...o.statues].filter(s => s.up && !s.sealed && COPYABLE(s.id) && !(id === 'G08' && phase !== 'post'));
-          const ok = tg.filter(s => s.id !== 'G08' || phase === 'post');
+          const ok = tg;
           if (ok.length) {
             const [t] = await this.ctrl[i].pick(this, i, 'copy', { statues: ok, n: 1, title: '選擇要複製獻祭效果的石像' });
             if (t) { this.note(`複製 ${CARDS[t.id].name} 的獻祭效果`, i); await this.resolve(i, t.id, phase); }
@@ -376,9 +375,14 @@
           break;
         }
         case 'G08': {
-          if (phase !== 'post') break;
-          const r = await this.ctrl[i].pick(this, i, 'g08', { cards: this.played[i].slice(), title: '選 1 張自己的出戰牌，變換屬性' });
-          if (r) { r.card.as = r.color; this.setCore(i); this.note(`把 ${CARDS[r.card.id].name} 變成${COLOR_NAME[r.color]}屬性`, i); await this.ui.ev('g08', { i }); }
+          if (phase === 'post') { // 翻牌後：變換 1 張已打出的出戰牌
+            const r = await this.ctrl[i].pick(this, i, 'g08', { cards: this.played[i].slice(), title: '花冠幻術師：選 1 張自己的出戰牌，變換屬性' });
+            if (r && r.card) { r.card.as = r.color; this.setCore(i); this.note(`把 ${CARDS[r.card.id].name} 變成${COLOR_NAME[r.color]}屬性`, i); await this.ui.ev('g08', { i }); }
+          } else { // 出牌階段：變換 1 張手牌（本回合），對手看不到是哪一張
+            if (!p.hand.length) break;
+            const r = await this.ctrl[i].pick(this, i, 'g08', { cards: p.hand.slice(), hand: true, title: '花冠幻術師：選 1 張手牌，變換屬性（本回合有效）' });
+            if (r && r.card) { r.card.as = r.color; this.note('變換 1 張手牌的屬性', i); await this.ui.ev('g08', { i, hand: true, card: r.card }); }
+          }
           break;
         }
         case 'G09': if (o.hand.length) await this.peek(i, 2); break;
@@ -462,6 +466,7 @@
         await this.ui.ev('summon', { i, statues: newS, rest: cards.filter(c => !sm.includes(c)) });
       }
       this.p.forEach(p => p.statues.forEach(s => { if (s.tmpSeal) { s.tmpSeal = false; s.sealed = false; } }));
+      this.p.forEach(p => [...p.hand, ...p.disc, ...p.deck].forEach(c => { delete c.as; })); // G08 的變換只到回合結束
       this.phase = 'end';
       await this.l13Cleanup();
       // 勝利

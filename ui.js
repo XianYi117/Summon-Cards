@@ -1,6 +1,6 @@
 // 召喚｜畫面與互動
 (function () {
-  const { Game, AI, shape, coreOf, summonList, LEVEL_NAME } = window.Engine;
+  const { Game, AI, shape, coreOf, summonList, colorOf, LEVEL_NAME } = window.Engine;
   const $ = s => document.querySelector(s);
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   let speed = 1;
@@ -181,6 +181,7 @@
 <h3>1. 抽牌與牌庫</h3><ul><li>沒用完的手牌會留著，補牌時補到 5 張。</li><li>牌庫抽完時，把棄牌區洗成新牌庫繼續抽。石像區的牌不洗回。</li></ul>
 <h3>2. 核心屬性與剋制</h3><ul><li><b>核心屬性</b>：重複最多的顏色，例如火火水草 → 火。兩對或沒有成對時，看最左邊那張。</li><li><b>牌型等級</b>由低到高：單張、一對、兩對、三同屬、四同屬。AAB、AABC 都算一對，AAAB 算三同屬。</li><li>只有雙方等級相同時才判定剋制，剋制成功 +2。</li></ul>
 <h3>3. 召喚哪一張</h3><ul><li>只能從成對的那組牌中召喚，固定取最左邊那張。兩對時，兩組各取最左邊那張。</li><li>所以出牌時的排列順序，會決定哪一張變成石像。遊戲中依你點選的順序由左到右排列。</li></ul>
+<h3>G08 花冠幻術師</h3><p>出牌階段獻祭：變換 1 張手牌的屬性（對手看不到是哪一張）；翻牌後獻祭：變換 1 張自己出戰牌的屬性。效果到回合結束，變成石像後恢復原本屬性。</p>
 <h3>4. 獻祭的順序</h3><p>W08、G06（本回合對手獻祭無效）可以主動先獻祭，也可以在對手獻祭時回應，效果等同【反擊】。主動先獻祭時，對手可以反擊。</p><ol><li>翻牌前（補牌後、出牌時）雙方隨時可以獻祭；翻牌後進入獻祭時間，畫面會顯示雙方目前戰力。</li><li>獻祭時間從起始玩家開始，雙方輪流宣告「獻祭」或「跳過」。</li><li>跳過不代表放棄，對手之後獻祭時，你還是可以回應。</li><li>雙方連續都跳過，獻祭時間就結束。</li></ol>
 <h3>5. 石像的狀態</h3><div class="tbl"><table><tr><th>狀態</th><th>擺法</th><th>技能</th><th>算進屬性數量</th></tr><tr><td>直立</td><td>直放</td><td>啟動有效，可以獻祭</td><td>算</td></tr><tr><td>已獻祭</td><td>橫放</td><td>沒有任何技能</td><td>不算（只算獻祭數量）</td></tr><tr><td>封印中</td><td>直放</td><td>啟動無效，也不能獻祭</td><td>算</td></tr></table></div>
 <ul><li><b>破壞</b>：被破壞的石像進棄牌區，之後會洗回牌庫。</li><li><b>封印通則</b>：被封印的能力在封印期間完全不生效，有利和不利的部分都一樣；累積的數值保留不變。</li></ul>
@@ -322,7 +323,7 @@
     if (mode === 'choose' && sel.length && !lastSettle) {
       const [, cat] = shape(sel);
       const ctx = { core: [null, null], cat: [cat, cat], bonus: [0, 0], immune: [false, false] };
-      ctx.bonus[ME] = G.ctx.bonus[ME]; ctx.core[ME] = G.lead(G.p[ME], 'L12') ? sel[0].id[0] : coreOf(sel, cat);
+      ctx.bonus[ME] = G.ctx.bonus[ME]; ctx.core[ME] = G.lead(G.p[ME], 'L12') ? colorOf(sel[0]) : coreOf(sel, cat);
       const x = G.power(ME, sel, ctx, true);
       box.innerHTML = '';
       const p = el('div', 'pw live me'); p.style.top = '352px';
@@ -426,6 +427,7 @@
       const e = cardEl(c.id, { uid: c.uid }); const off = k - (n - 1) / 2;
       e.style.setProperty('--rot', off * 3.5 + 'deg'); e.style.setProperty('--ty', Math.abs(off) * 6 + 'px');
       if (fresh.has(c.uid)) e.classList.add('drawn');
+      if (c.as) { e.querySelector('.shade').style.boxShadow = `inset 0 0 0 5px var(--${{ F: 'fire', W: 'water', G: 'grass' }[c.as]})`; e.appendChild(el('div', 'astag ' + c.as, `視為${COLOR_NAME[c.as]}`)); }
       const si = sel.indexOf(c); if (si >= 0) { e.classList.add('sel'); e.appendChild(el('div', 'ord', si + 1)); }
       if (pickables && pickables.cards && pickables.cards.includes(c)) e.classList.add('sel');
       e.onclick = () => {
@@ -433,7 +435,7 @@
         const j = sel.indexOf(c); if (j >= 0) sel.splice(j, 1); else if (sel.length < 4) sel.push(c);
         renderHand(); renderAct(); renderLive();
       };
-      tilt(e, 16); bindHover(e, c.id); h.appendChild(e);
+      tilt(e, 16); bindHover(e, c.id, c.as ? `<br><b>本回合視為${COLOR_NAME[c.as]}屬性</b>` : ''); h.appendChild(e);
     });
     fresh.clear();
   }
@@ -459,7 +461,7 @@
     } else {
       if (p.sacUsed) out.push({ t: 'debuff', h: '本回合', d: '已經獻祭過' });
       if (c && c.blocked[idx]) out.push({ t: 'debuff', h: '本回合', d: '不能獻祭' });
-      for (const s of p.statues.filter(x => x.up)) out.push({ t: 'st', id: s.id, h: cname(s.id), d: CARDS[s.id].sac, off: s.sealed ? (s.byL13 ? '被雙界封印，不能獻祭' : '封印中，不能獻祭') : s.maint && !p.lsealed ? '維持雙界封印中，不能獻祭' : '', note: s.id === 'G08' ? '翻牌後才能獻祭' : '' });
+      for (const s of p.statues.filter(x => x.up)) out.push({ t: 'st', id: s.id, h: cname(s.id), d: CARDS[s.id].sac, off: s.sealed ? (s.byL13 ? '被雙界封印，不能獻祭' : '封印中，不能獻祭') : s.maint && !p.lsealed ? '維持雙界封印中，不能獻祭' : '', note: s.id === 'G08' ? '出牌階段：變換手牌；翻牌後：變換出戰牌' : '' });
       if (!p.statues.some(x => x.up)) out.push({ t: 'info', h: '沒有可獻祭的石像', d: '' });
       const down = p.statues.filter(x => !x.up);
       if (down.length) out.push({ t: 'info', h: `已獻祭 ${down.length} 座`, d: down.map(x => cname(x.id)).join('、') });
@@ -503,15 +505,15 @@
         const [, cat, name] = shape(sel);
         const ctx = { core: [null, null], cat: [cat, cat], bonus: [0, 0], immune: [false, false] };
         ctx.bonus[ME] = G.ctx.bonus[ME];
-        ctx.core[ME] = G.lead(G.p[ME], 'L12') ? sel[0].id[0] : coreOf(sel, cat);
+        ctx.core[ME] = G.lead(G.p[ME], 'L12') ? colorOf(sel[0]) : coreOf(sel, cat);
         const pw = G.power(ME, sel, ctx);
         const sm = summonList(sel, cat, G.lead(G.p[ME], 'L12'));
         a.appendChild(el('div', 'preview', `${name}．${LEVEL_NAME[cat]}．核心${COLOR_NAME[ctx.core[ME]]}．戰力<b>${pw}</b>${sm.length ? `　召喚：${sm.map(c => CARDS[c.id].name).join('、')}` : '　不召喚'}`));
       } else a.appendChild(el('div', 'preview', '點選 1～4 張手牌，點選順序就是由左到右的排列'));
       const go = el('button', 'btn primary', '出牌'); go.disabled = !sel.length;
       go.onclick = () => { if (!resolver || mode !== 'choose') return; const r = resolver; resolver = null; mode = 'wait'; const s = sel.slice(); sel = []; lockCards[ME] = s; renderAll(); r(s); };
-      const sac = el('button', 'btn', '發動（獻祭）'); sac.disabled = !G.canSacList(ME, 'pre').length;
-      sac.title = sac.disabled ? (G.p[ME].sacUsed ? '本回合已經獻祭過' : G.ctx && G.ctx.blocked[ME] ? '本回合被封鎖，不能獻祭' : G.canSacList(ME).length ? 'G08 要翻牌後才能獻祭' : '沒有可以獻祭的石像') : '';
+      const sac = el('button', 'btn', '發動（獻祭）'); sac.disabled = !G.canSacList(ME).length;
+      sac.title = sac.disabled ? (G.p[ME].sacUsed ? '本回合已經獻祭過' : G.ctx && G.ctx.blocked[ME] ? '本回合被封鎖，不能獻祭' : '沒有可以獻祭的石像') : '';
       sac.onclick = () => humanPreSac();
       if (!sac.disabled && (!resolver || (net.on && (net.sacQ.length || net.sacBusy)))) sac.disabled = true;
       const clr = el('button', 'btn ghost', '清除'); clr.disabled = !sel.length; clr.onclick = () => { sel = []; renderHand(); renderAct(); renderLive(); };
@@ -524,7 +526,7 @@
       a.appendChild(el('div', 'preview', '點選場上發光的石像'));
       if (boardSkip) { const sk = el('button', 'btn', '不反擊'); sk.onclick = () => boardSkip(); a.appendChild(sk); }
     } else if (mode === 'presac') {
-      a.appendChild(el('div', 'preview', '點選要獻祭的石像' + (G.canSacList(ME).some(s => s.id === 'G08') ? '<br><small>G08 花冠幻術師要等翻牌後的獻祭時間才能用</small>' : '')));
+      a.appendChild(el('div', 'preview', '點選要獻祭的石像'));
       const back = el('button', 'btn ghost', '取消'); back.onclick = () => { pickables = null; mode = 'choose'; renderAll(); };
       a.appendChild(back);
     }
@@ -585,7 +587,7 @@
         stage.querySelectorAll('#zFoePlay .card').forEach(c => c.classList.remove('down'));
         await wait(650); renderAll(); break;
       case 'pass': if (d.i !== ME) await banner('對手跳過', 600); break;
-      case 'g08': renderAll(); await wait(500); break;
+      case 'g08': if (d.hand && d.i !== ME) await banner(`${who(d.i)}用花冠幻術師變換了 1 張手牌的屬性`, 900); renderAll(); await wait(400); break;
       case 'settle': {
         // 對局紀錄：在戰力那一行補上雙方出牌與戰力明細
         const last = logs[logs.length - 1];
@@ -729,10 +731,10 @@
       b.appendChild(r); m.hidden = false;
     });
   }
-  function modalG08(cards) {
+  function modalG08(cards, title) {
     return new Promise(res => {
       const m = $('#modal'), b = $('#mbox'); b.innerHTML = '';
-      b.appendChild(el('h3', '', '花冠幻術師：變換 1 張出戰牌的屬性'));
+      b.appendChild(el('h3', '', title || '花冠幻術師：變換 1 張出戰牌的屬性'));
       let pick = null, color = null;
       const row = el('div', 'mcards'), cols = el('div', 'mrow');
       const ok = el('button', 'btn primary', '確定'); ok.disabled = true;
@@ -755,7 +757,7 @@
   let boardSkip = null;
   async function humanPreSac() {
     if (mode !== 'choose' || !resolver) return;
-    const list = G.canSacList(ME, 'pre'); if (!list.length) return;
+    const list = G.canSacList(ME); if (!list.length) return;
     mode = 'presac';
     pickables = { list, on: async st => {
       if (mode !== 'presac' || !resolver) return;
@@ -796,7 +798,7 @@
         case 'swap': return modalCards(o.title, o.cards, { n: 1 });
         case 'l02': return modalCards(o.title, o.cards, { n: 2, upTo: true, okText: '放回牌庫底', skipText: '不放回' , optional: true });
         case 'destroy': case 'seal': case 'copy': { const s = await boardPick(o.statues, o.title + '：點選場上發光的石像'); return s ? [s] : []; }
-        case 'g08': return modalG08(o.cards);
+        case 'g08': return modalG08(o.cards, o.title);
         case 'l13': {
           const out = [];
           for (let k = 0; k < o.n; k++) { const left = o.statues.filter(s => !out.includes(s)); if (!left.length) break; const s = await boardPick(left, `雙界封印：點選要封印的對手石像（${k + 1}／${o.n}）`); if (s) out.push(s); }
@@ -1142,6 +1144,6 @@
   $('#wBack').onclick = () => { watch.close(); show('home'); };
 
   window.__summonLog = () => logs.map(l => `${l.turn}|${l.who}|${l.text}`);
-  window.__summonState = () => G && JSON.stringify({ me: ME, turn: G.turn, phase: G.phase, first: G.first, q: Object.values(net.queues).reduce((a, x) => a + x.length, 0), w: Object.values(net.waiters).reduce((a, x) => a + x.length, 0), p: G.p.map(p => ({ s: p.score, h: p.hand.map(c => c.uid), d: p.deck.length, x: p.disc.length, st: p.statues.map(t => t.uid + (t.up ? '' : 'v') + (t.sealed ? 's' : '')), u: p.sacUsed })) });
+  window.__summonState = () => G && JSON.stringify({ mode, pk: pickables ? pickables.list.map(x => x.id) : null, res: !!resolver, me: ME, turn: G.turn, phase: G.phase, first: G.first, q: Object.values(net.queues).reduce((a, x) => a + x.length, 0), w: Object.values(net.waiters).reduce((a, x) => a + x.length, 0), p: G.p.map(p => ({ s: p.score, h: p.hand.map(c => c.uid), d: p.deck.length, x: p.disc.length, st: p.statues.map(t => t.uid + (t.up ? '' : 'v') + (t.sealed ? 's' : '')), u: p.sacUsed })) });
   show('home');
 })();
