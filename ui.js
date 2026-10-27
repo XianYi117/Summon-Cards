@@ -183,10 +183,10 @@
 <h3>牌型大小</h3>
 <p>同顏色越多越強，A、B、C 代表不同屬性。</p>
 <div class="tbl"><table><tr><th>牌型</th><th>例子</th><th>戰力</th><th>變成石像</th></tr>${pw.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}</table></div>
-<p><b>剋制</b>：火剋草、草剋水、水剋火。雙方牌型等級相同時，剋制的一方戰力 +2。</p>
+<p><b>剋制</b>：火剋草、草剋水、水剋火。不限牌型，每回合都比較雙方的核心屬性，剋制的一方戰力 +2。</p>
 <details><summary>詳細規則</summary>
 <h3>1. 抽牌與牌庫</h3><ul><li>沒用完的手牌會留著，補牌時補到 5 張。</li><li>牌庫抽完時，把棄牌區洗成新牌庫繼續抽。石像區的牌不洗回。</li></ul>
-<h3>2. 核心屬性與剋制</h3><ul><li><b>核心屬性</b>：重複最多的顏色，例如火火水草 → 火。兩對或沒有成對時，看最左邊那張。</li><li><b>牌型等級</b>由低到高：單張、一對、兩對、三同屬、四同屬。AAB、AABC 都算一對，AAAB 算三同屬。</li><li>只有雙方等級相同時才判定剋制，剋制成功 +2。</li></ul>
+<h3>2. 核心屬性與剋制</h3><ul><li><b>核心屬性</b>：重複最多的顏色，例如火火水草 → 火。兩對時看最左邊那張，例如火火水水 → 火。</li><li><b>沒有成對</b>（A、AB、ABC）：沒有核心屬性，不能剋制對手，也不會被剋制（L12 例外）。</li><li><b>剋制不限牌型</b>：每回合都判定，例如 AA 的火對上 AAA 的草，火方照樣 +2。剋制成功 +2。</li></ul>
 <h3>3. 召喚哪一張</h3><ul><li>只能從成對的那組牌中召喚，固定取最左邊那張。兩對時，兩組各取最左邊那張。</li><li>所以出牌時的排列順序，會決定哪一張變成石像。遊戲中依你點選的順序由左到右排列。</li></ul>
 <h3>G08 花冠幻術師</h3><p>出牌階段獻祭：變換 1 張手牌的屬性（對手看不到是哪一張）；翻牌後獻祭：變換 1 張自己出戰牌的屬性。效果到回合結束，變成石像後恢復原本屬性。</p>
 <h3>4. 獻祭的順序</h3><p>W08、G06（本回合對手獻祭無效）可以主動先獻祭，也可以在對手獻祭時回應，效果等同【反擊】。主動先獻祭時，對手可以反擊。</p><ol><li>翻牌前（補牌後、出牌時）雙方隨時可以獻祭；翻牌後進入獻祭時間，畫面會顯示雙方目前戰力。</li><li>獻祭時間從起始玩家開始，雙方輪流宣告「獻祭」或「跳過」。</li><li>跳過不代表放棄，對手之後獻祭時，你還是可以回應。</li><li>雙方連續都跳過，獻祭時間就結束。</li></ol>
@@ -501,7 +501,7 @@
     const hit = r => name && r[0].split('、').includes(name);
     $('#cheat').innerHTML = `<h4>牌型速查<small>${l12 ? 'L12 專屬戰力' : 'A、B、C＝不同屬性'}</small></h4>
       <table><tr class="hd"><td>牌型</td><td>戰力</td><td>石像</td></tr>${rows.map(r => `<tr class="${hit(r) ? 'on' : ''}"><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</table>
-      <div class="kz"><span class="F">火</span>剋<span class="G">草</span>．<span class="G">草</span>剋<span class="W">水</span>．<span class="W">水</span>剋<span class="F">火</span><br>雙方牌型同等級時，剋制方 +2</div>`;
+      <div class="kz"><span class="F">火</span>剋<span class="G">草</span>．<span class="G">草</span>剋<span class="W">水</span>．<span class="W">水</span>剋<span class="F">火</span><br>不限牌型，剋制方 +2；沒成對無屬性</div>`;
   }
   function renderAct() {
     const a = $('#actbar'); a.innerHTML = '';
@@ -515,7 +515,7 @@
         ctx.core[ME] = G.lead(G.p[ME], 'L12') ? colorOf(sel[0]) : coreOf(sel, cat);
         const pw = G.power(ME, sel, ctx);
         const sm = summonList(sel, cat, G.lead(G.p[ME], 'L12'));
-        a.appendChild(el('div', 'preview', `${name}．${LEVEL_NAME[cat]}．核心${COLOR_NAME[ctx.core[ME]]}．戰力<b>${pw}</b>${sm.length ? `　召喚：${sm.map(c => CARDS[c.id].name).join('、')}` : '　不召喚'}`));
+        a.appendChild(el('div', 'preview', `${name}．${LEVEL_NAME[cat]}．${cat === '1' && !G.lead(G.p[ME], 'L12') ? '無核心屬性' : '核心' + COLOR_NAME[ctx.core[ME]]}．戰力<b>${pw}</b>${sm.length ? `　召喚：${sm.map(c => CARDS[c.id].name).join('、')}` : '　不召喚'}`));
       } else a.appendChild(el('div', 'preview', '點選 1～4 張手牌，點選順序就是由左到右的排列'));
       const go = el('button', 'btn primary', '出牌'); go.disabled = !sel.length;
       go.onclick = () => { if (!resolver || mode !== 'choose') return; const r = resolver; resolver = null; mode = 'wait'; const s = sel.slice(); sel = []; lockCards[ME] = s; renderAll(); r(s); };
@@ -696,7 +696,7 @@
 <p><b>6 整理</b>：其餘出戰牌進棄牌區。</p>
 <p><b>獻祭</b>：補牌後到戰力計算前，每回合可以獻祭 1 座石像，發動它的獻祭效果；獻祭後橫放在獻祭區。翻牌後雙方輪流宣告獻祭或跳過，畫面會顯示目前戰力。</p>
 <p><b>核心屬性</b>：重複最多的顏色；兩對或沒成對時看最左邊那張。</p>
-<p><b>剋制</b>：火剋草、草剋水、水剋火，雙方牌型同等級時剋制方 +2。等級：單張＜一對＜兩對＜三同屬＜四同屬。</p>`));
+<p><b>剋制</b>：火剋草、草剋水、水剋火，不限牌型，剋制方 +2。沒有成對（A、AB、ABC）時沒有核心屬性，不剋也不被剋（L12 例外）。</p>`));
     const x = el('button', 'btn small', '關閉'); x.onclick = () => m.hidden = true; b.appendChild(x);
     m.hidden = false;
   };

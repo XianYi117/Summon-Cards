@@ -273,7 +273,9 @@
       const adv = [false, false];
       for (const i of [0, 1]) {
         const p = this.p[i], o = this.opp(i), j = 1 - i;
-        const same = ctx.cat[i] === ctx.cat[j] || this.lead(p, 'L12');
+        // 剋制不限牌型；沒有成對（A、AB、ABC）時沒有核心屬性，不剋人也不會被剋（L12 例外）
+        const hasCore = k => ctx.cat[k] !== '1' || this.lead(this.p[k], 'L12');
+        const same = hasCore(i) && hasCore(j);
         const oImm = ctx.immune[j] || this.lead(o, 'L12');
         if (same && BEATS[ctx.core[i]] === ctx.core[j] && !oImm) adv[i] = true;
       }
