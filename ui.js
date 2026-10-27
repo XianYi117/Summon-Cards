@@ -237,7 +237,9 @@
   function fitStage() {
     const w = innerWidth, h = innerHeight;
     scale = Math.min(w / 1280, h / 720);
-    stage.style.transform = `translate(-50%,-50%) scale(${scale})`; stage.style.transformOrigin = '50% 50%';
+    stage.style.transform = `translate(-50%,-50%) scale(${scale})`;
+    // 畫面縮小時，提示框和卡片說明的字反向放大（最多 1.5 倍），保持看得清楚
+    stage.style.setProperty('--ts', Math.min(1.5, Math.max(1, 1 / scale)).toFixed(3)); stage.style.transformOrigin = '50% 50%';
   }
   addEventListener('resize', () => { if (!$('#battle').hidden) fitStage(); });
   function relRect(e) { const s = stage.getBoundingClientRect(), r = e.getBoundingClientRect(); return { x: (r.left - s.left) / scale, y: (r.top - s.top) / scale, w: r.width / scale, h: r.height / scale }; }
