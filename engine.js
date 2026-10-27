@@ -49,8 +49,8 @@
 
   function buildDeck(type) {
     if (Array.isArray(type)) return shuffle(type.map(id => ({ uid: UID++, id })));
-    let comp = (DECKS[type] || DECKS.RND).comp;
-    if (!comp) comp = [DECKS.FW, DECKS.GF, DECKS.WG][rnd(3)].comp;
+    const comp = (DECKS[type] || DECKS.RND).comp;
+    if (!comp) return shuffle(randomDeckIds(RNG).map(id => ({ uid: UID++, id })));
     const deck = [];
     for (const col of ['F', 'W', 'G']) {
       const ids = Object.keys(CARDS).filter(id => id[0] === col);
@@ -452,8 +452,8 @@
       if (ev.w !== null) {
         const p = this.p[ev.w]; gain = this.ctx.extraPt[ev.w] ? 2 : 1;
         p.score += gain;
-        if (this.lead(p, 'L01')) p.l01++;
-        // L01 落敗就歸零：被封印（本回合隊長效果無效）時也照樣歸零
+        // L01：封印只影響戰力計算（加成無效）；判定勝負時封印已結束，贏照樣 +1、輸照樣歸零
+        if (p.leader === 'L01') p.l01++;
         const l = this.opp(ev.w); if (l.leader === 'L01') l.l01 = 0;
       }
       this.note(ev.w === null ? `戰力 ${ev.pw[0]} 對 ${ev.pw[1]}，平手` : `戰力 ${ev.pw[0]} 對 ${ev.pw[1]}，${ev.w === 0 ? '我方' : '對手'}得 ${gain} 分`);

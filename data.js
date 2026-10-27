@@ -56,6 +56,18 @@ const DECKS = {
   WG: { label: '水草', comp: { W: 8, G: 8, F: 4 } },
   RND: { label: '隨機', comp: null },
 };
+const ATTR_MAX = 8; // 一種屬性最多 8 張
+// 隨機牌組：27 張中隨機抽 20 張，任一屬性超過 8 張就重抽（每種合法組合機率相同）
+function randomDeckIds(rand = Math.random) {
+  const all = Object.keys(CARDS);
+  for (;;) {
+    const a = all.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    const pick = a.slice(0, 20), cnt = { F: 0, W: 0, G: 0 };
+    pick.forEach(id => cnt[id[0]]++);
+    if (Math.max(cnt.F, cnt.W, cnt.G) <= ATTR_MAX) return pick.sort();
+  }
+}
 
 // 卡圖：場上用小圖（cards/sm/，300px 寬），圖鑑大圖與對戰前畫面用原圖
 const img = (id, hi) => hi ? `cards/${id}.webp` : `cards/sm/${id}.webp`;

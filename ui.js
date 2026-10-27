@@ -95,7 +95,7 @@
     const dk = el('div', 'chips');
     for (const key of Object.keys(DECKS)) {
       const d = DECKS[key];
-      const sub = d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : '<small>三色 8／8／4 隨機</small>';
+      const sub = d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : '<small>27 張隨機 20 張．每屬性最多 8</small>';
       const b = el('button', 'chip', `<span>${d.label}</span>${sub}`); b.setAttribute('aria-pressed', s.deck === key);
       b.onclick = () => { s.deck = key; if (s.leader === 'L11' && !s.mainTouched && d.comp) s.main = Object.keys(d.comp)[0]; renderPick(); };
       dk.appendChild(b);
@@ -112,8 +112,8 @@
   $('#pickBack').onclick = () => { if (net.on) { if (net.conn) net.send({ k: 'bye' }); net.close(); show('home'); return; } if (pickStep === 'foe') { pickStep = 'me'; renderPick(); } else show('home'); };
   // 依牌組類型抽出 20 張（每色張數照設定，色內隨機）
   function rollDeck(type) {
-    let comp = (DECKS[type] || DECKS.RND).comp;
-    if (!comp) comp = [DECKS.FW, DECKS.GF, DECKS.WG][Math.floor(Math.random() * 3)].comp;
+    const comp = (DECKS[type] || DECKS.RND).comp;
+    if (!comp) return randomDeckIds();
     const out = [];
     for (const col of ['F', 'W', 'G']) {
       const ids = Object.keys(CARDS).filter(id => id[0] === col).sort(() => Math.random() - .5);
@@ -191,7 +191,7 @@
 <h3>G08 花冠幻術師</h3><p>出牌階段獻祭：變換 1 張手牌的屬性（對手看不到是哪一張）；翻牌後獻祭：變換 1 張自己出戰牌的屬性。效果到回合結束，變成石像後恢復原本屬性。</p>
 <h3>4. 獻祭的順序</h3><p>W08、G06（本回合對手獻祭無效）可以主動先獻祭，也可以在對手獻祭時回應，效果等同【反擊】。主動先獻祭時，對手可以反擊。</p><ol><li>翻牌前（補牌後、出牌時）雙方隨時可以獻祭；翻牌後進入獻祭時間，畫面會顯示雙方目前戰力。</li><li>獻祭時間從起始玩家開始，雙方輪流宣告「獻祭」或「跳過」。</li><li>跳過不代表放棄，對手之後獻祭時，你還是可以回應。</li><li>雙方連續都跳過，獻祭時間就結束。</li></ol>
 <h3>5. 石像的狀態</h3><div class="tbl"><table><tr><th>狀態</th><th>擺法</th><th>技能</th><th>算進屬性數量</th></tr><tr><td>直立</td><td>直放</td><td>啟動有效，可以獻祭</td><td>算</td></tr><tr><td>已獻祭</td><td>橫放</td><td>沒有任何技能</td><td>不算（只算獻祭數量）</td></tr><tr><td>封印中</td><td>直放</td><td>啟動無效，也不能獻祭</td><td>算</td></tr></table></div>
-<ul><li><b>破壞</b>：被破壞的石像進棄牌區，之後會洗回牌庫。</li><li><b>封印通則</b>：被封印的能力在封印期間完全不生效，有利和不利的部分都一樣；累積的數值保留不變。</li></ul>
+<ul><li><b>破壞</b>：被破壞的石像進棄牌區，之後會洗回牌庫。</li><li><b>封印通則</b>：被封印的能力在封印期間完全不生效，有利和不利的部分都一樣；累積的數值保留不變。</li><li><b>L01 被封印</b>：封印只作用在戰力計算，該回合連勝加成無效；判定勝負時封印效果已結束，所以贏了照樣 +1、輸了照樣歸零。</li></ul>
 <h3>6. 效果處理</h3><ul><li>每回合觸發的啟動效果，都在補牌後處理。雙方同時觸發時，起始玩家先處理。</li><li>技能帶來的額外抽牌不受 5 張限制，但下回合補牌仍以 5 張為準。</li><li>獻祭得到的能力只持續本回合。</li></ul>
 <h3>7. 勝利的細節</h3><ul><li>隊長的特殊勝利條件一達成，就立刻獲勝。</li><li>需要指定顏色才能獲勝的隊長（L11 冥火貓妖），開局要<b>宣告</b>主色是哪個屬性，雙方都看得到。</li><li>雙方同時達成勝利條件時，進入搶 1 分加賽。</li></ul>
 <h3>8. 隊長說明</h3><div class="tbl"><table><tr><th>隊長</th><th>說明</th></tr>${leaderIds.map(id => `<tr><td>${id} ${LEADERS[id].name}</td><td>${LEADERS[id].text}</td></tr>`).join('')}</table></div>
