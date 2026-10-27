@@ -51,9 +51,9 @@ const LEADERS = {
 for (const id in LEADERS) LEADERS[id].id = id;
 
 const DECKS = {
-  FW: { label: '火水', comp: { F: 7, W: 7, G: 6 } },
-  GF: { label: '草火', comp: { G: 7, F: 7, W: 6 } },
-  WG: { label: '水草', comp: { W: 7, G: 7, F: 6 } },
+  FW: { label: '火水', comp: { F: 8, W: 8, G: 4 } },
+  GF: { label: '草火', comp: { G: 8, F: 8, W: 4 } },
+  WG: { label: '水草', comp: { W: 8, G: 8, F: 4 } },
   RND: { label: '隨機', comp: null },
 };
 

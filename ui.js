@@ -95,7 +95,7 @@
     const dk = el('div', 'chips');
     for (const key of Object.keys(DECKS)) {
       const d = DECKS[key];
-      const sub = d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : '<small>三色 7／7／6 隨機</small>';
+      const sub = d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : '<small>三色 8／8／4 隨機</small>';
       const b = el('button', 'chip', `<span>${d.label}</span>${sub}`); b.setAttribute('aria-pressed', s.deck === key);
       b.onclick = () => { s.deck = key; if (s.leader === 'L11' && !s.mainTouched && d.comp) s.main = Object.keys(d.comp)[0]; renderPick(); };
       dk.appendChild(b);
@@ -168,7 +168,7 @@
 <h3>怎麼贏</h3>
 <div class="wins3"><div><b>得分勝利</b>先拿到 4 分。每回合比戰力，贏的人得 1 分。</div><div><b>隊長勝利</b>部分隊長有自己的勝利條件，達成就立刻獲勝。</div><div><b>石像勝利</b>石像卡上寫明的勝利效果。</div></div>
 <h3>卡牌構築、開始設置</h3>
-<ul><li><b>構築</b>：每人組合 20 張卡牌（一種屬性最多 7 張，編號不得重複）和 1 位隊長。</li>
+<ul><li><b>構築</b>：每人組合 20 張卡牌（一種屬性最多 8 張，編號不得重複）和 1 位隊長。</li>
 <li><b>設置</b>：挑選 1 位隊長，洗牌後各抽 5 張。猜拳決定第一回合的起始玩家，之後每回合輪流當起始玩家。</li></ul>
 <h3>回合流程</h3>
 <ol><li><b>補牌</b>：手牌補到 5 張，再處理石像「每回合」的效果，例如多抽、讓對手棄牌。</li>
