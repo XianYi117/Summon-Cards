@@ -57,4 +57,10 @@ const DECKS = {
   RND: { label: '隨機', comp: null },
 };
 
-const img = id => `cards/${id}.webp`;
+// 卡圖：場上用小圖（cards/sm/，300px 寬），圖鑑大圖與對戰前畫面用原圖
+const img = (id, hi) => hi ? `cards/${id}.webp` : `cards/sm/${id}.webp`;
+// 開頁後在背景預載全部小圖，對戰中翻牌不用再等下載
+const IMG_CACHE = [];
+(window.requestIdleCallback || (f => setTimeout(f, 300)))(() => {
+  for (const id of [...Object.keys(CARDS), ...Object.keys(LEADERS)]) { const im = new Image(); im.decoding = 'async'; im.src = img(id); IMG_CACHE.push(im); }
+});

@@ -13,19 +13,24 @@
     if (id) c.dataset.id = id;
     if (o.uid) c.dataset.uid = o.uid;
     const nm = id && info(id) ? info(id).name : '卡背';
-    c.innerHTML = `<div class="inner"><div class="face">${id ? `<img src="${img(id)}" alt="${id} ${nm}" loading="lazy">` : ''}</div><div class="back"></div></div><div class="shade"></div><div class="glare"></div>`;
+    c.innerHTML = `<div class="inner"><div class="face">${id ? `<img src="${img(id, o.hi)}" alt="${id} ${nm}" decoding="async">` : ''}</div><div class="back"></div></div><div class="shade"></div><div class="glare"></div>`;
     return c;
   }
+  // 滑鼠懸停時卡片傾斜＋高亮；用 requestAnimationFrame 節流（每個畫面最多算一次），觸控裝置不啟用
+  const canHover = matchMedia('(hover: hover) and (pointer: fine)').matches;
   function tilt(c, strength = 14) {
+    if (!canHover) return;
     const inner = c.querySelector('.inner');
-    c.addEventListener('pointermove', e => {
+    let ev = null, raf = 0;
+    const apply = () => {
+      raf = 0; if (!ev) return;
       const r = c.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+      const x = (ev.clientX - r.left) / r.width, y = (ev.clientY - r.top) / r.height;
       inner.style.transform = `${c.classList.contains('down') ? 'rotateY(180deg) ' : ''}rotateX(${(.5 - y) * strength}deg) rotateY(${(x - .5) * strength}deg)`;
-      c.style.setProperty('--gx', x * 100 + '%'); c.style.setProperty('--gy', y * 100 + '%');
-      c.classList.add('lit');
-    });
-    c.addEventListener('pointerleave', () => { inner.style.transform = ''; c.classList.remove('lit'); });
+    };
+    c.addEventListener('pointerenter', () => c.classList.add('lit'));
+    c.addEventListener('pointermove', e => { ev = e; if (!raf) raf = requestAnimationFrame(apply); });
+    c.addEventListener('pointerleave', () => { ev = null; if (raf) cancelAnimationFrame(raf); raf = 0; inner.style.transform = ''; c.classList.remove('lit'); });
   }
 
   // ---------- 畫面切換 ----------
@@ -144,7 +149,7 @@
     const side = (box, s, who) => {
       box.innerHTML = '';
       const id = s.realLeader || s.leader;
-      const c = cardEl(id); tilt(c, 10); box.appendChild(c);
+      const c = cardEl(id, { hi: true }); tilt(c, 10); box.appendChild(c);
       box.appendChild(el('div', 'nm', `${who}．${LEADERS[id].name}`));
       box.appendChild(el('div', 'dk', `牌組：${DECKS[s.deckType || s.deck].label}${s.main ? `．宣告主色 <span class="ctag ${s.main}">${COLOR_NAME[s.main]}</span>` : ''}${s.leader === 'RANDOM' || s.randLeader ? '．隨機隊長' : ''}`));
     };
@@ -204,14 +209,14 @@
     const grid = $('#galGrid'); grid.innerHTML = '';
     const ids = [...Object.keys(CARDS), ...leaderIds].filter(id => filter === 'all' || (filter === 'L' ? id[0] === 'L' : id[0] === filter && id[0] !== 'L'));
     for (const id of ids) {
-      const c = cardEl(id); c.tabIndex = 0; c.setAttribute('role', 'button');
+      const c = cardEl(id, { hi: true }); c.tabIndex = 0; c.setAttribute('role', 'button');
       c.onclick = () => openBig(id); c.onkeydown = e => { if (e.key === 'Enter') openBig(id); };
       grid.appendChild(c);
     }
   }
   function openBig(id) {
     const m = $('#galModal'), b = $('#galBox'); b.innerHTML = '';
-    const c = cardEl(id, { cls: 'big-card' }); tilt(c, 18); b.appendChild(c);
+    const c = cardEl(id, { cls: 'big-card', hi: true }); tilt(c, 18); b.appendChild(c);
     const d = info(id);
     b.appendChild(el('h3', '', `${id}．${d.name}`));
     if (id[0] === 'L') b.appendChild(el('p', '', `${COLOR_NAME[d.color]}屬性．${d.race}．${d.skill}：${d.text}`));

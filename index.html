@@ -48,8 +48,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .card .back::after{content:"召";position:absolute;inset:0;display:grid;place-items:center;font-family:var(--f-display);font-weight:900;font-size:calc(var(--w,96px)*.34);color:#e6c77e;text-shadow:0 2px 6px #000}
 .card.down .inner{transform:rotateY(180deg)}
 .card .glare{position:absolute;inset:0;border-radius:6%;pointer-events:none;opacity:0;transition:opacity .2s;
-  background:radial-gradient(circle at var(--gx,50%) var(--gy,50%),#ffffff66,transparent 45%),
-  linear-gradient(115deg,transparent 30%,#ffe9b31f 45%,#9fd7ff1a 55%,transparent 70%);mix-blend-mode:screen}
+  background:linear-gradient(115deg,transparent 25%,#ffe9b333 45%,#9fd7ff26 55%,transparent 75%);mix-blend-mode:screen}
 .card.lit .glare{opacity:1}
 .card .shade{position:absolute;inset:0;border-radius:6%;pointer-events:none}
 
