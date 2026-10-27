@@ -50,6 +50,8 @@
   // ---------- 選角 ----------
   let cfg = { me: {}, foe: {} }, pickStep = 'me';
   const leaderIds = Object.keys(LEADERS);
+  // 隨機隊長只從這些隊長中挑（L10～L13 調整中，暫不參與隨機；仍可手動選）
+  const RANDOM_LEADERS = leaderIds.filter(id => !['L10', 'L11', 'L12', 'L13'].includes(id));
   function renderPick() {
     const s = cfg[pickStep], isFoe = pickStep === 'foe';
     $('#pickStep').textContent = net.on ? `連線對戰．房間 ${net.code}` : isFoe ? 'STEP 2 / 2' : 'STEP 1 / 2';
@@ -70,7 +72,7 @@
     }
     const inf = $('#pickInfo'); inf.innerHTML = '';
     if (!s.leader) inf.appendChild(el('div', 'empty', '點選一張隊長卡。<br>每位隊長都有專屬能力，部分隊長還有特殊勝利條件。'));
-    else if (s.leader === 'RANDOM') inf.append(el('h3', '', '隨機隊長'), el('div', 'desc', '開戰時從 13 位隊長中隨機決定。'));
+    else if (s.leader === 'RANDOM') inf.append(el('h3', '', '隨機隊長'), el('div', 'desc', `開戰時從 L01～L09（${RANDOM_LEADERS.length} 位）中隨機決定；L10～L13 調整中，不會被隨機選到，但可以手動選擇。`));
     else {
       const L = LEADERS[s.leader];
       inf.append(el('div', 'lab', `${s.leader}．${COLOR_NAME[L.color]}屬性．${L.race}`), el('h3', '', L.name), el('div', 'skill', L.skill), el('div', 'desc', L.text));
@@ -115,7 +117,7 @@
     return out;
   }
   function resolveSide(s) {
-    s.realLeader = s.leader === 'RANDOM' ? leaderIds[Math.floor(Math.random() * leaderIds.length)] : s.leader;
+    s.realLeader = s.leader === 'RANDOM' ? RANDOM_LEADERS[Math.floor(Math.random() * RANDOM_LEADERS.length)] : s.leader;
     if (s.realLeader !== 'L11') delete s.main;
     else if (!s.main) s.main = ['F', 'W', 'G'][Math.floor(Math.random() * 3)];
     s.cards = rollDeck(s.deck);
