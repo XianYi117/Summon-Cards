@@ -453,7 +453,8 @@
         const p = this.p[ev.w]; gain = this.ctx.extraPt[ev.w] ? 2 : 1;
         p.score += gain;
         if (this.lead(p, 'L01')) p.l01++;
-        const l = this.opp(ev.w); if (this.lead(l, 'L01')) l.l01 = 0;
+        // L01 落敗就歸零：被封印（本回合隊長效果無效）時也照樣歸零
+        const l = this.opp(ev.w); if (l.leader === 'L01') l.l01 = 0;
       }
       this.note(ev.w === null ? `戰力 ${ev.pw[0]} 對 ${ev.pw[1]}，平手` : `戰力 ${ev.pw[0]} 對 ${ev.pw[1]}，${ev.w === 0 ? '我方' : '對手'}得 ${gain} 分`);
       await this.ui.ev('settle', { ...ev, gain });
