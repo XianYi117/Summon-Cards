@@ -230,6 +230,7 @@
     async peek(i, n) {
       const o = this.opp(i);
       const cards = shuffle(o.hand.slice()).slice(0, n);
+      this.p[i].peeked = cards; // 電腦 AI 出牌時會用到看過的牌
       await this.ui.ev('peek', { i, cards });
     }
 
@@ -406,7 +407,7 @@
     }
     async playTurn() {
       this.turn++;
-      this.p.forEach(p => { p.sacUsed = false; p.lsealed = false; });
+      this.p.forEach(p => { p.sacUsed = false; p.lsealed = false; p.peeked = []; });
       this.syncL13();
       this.ctx = { core: [null, null], cat: [null, null], bonus: [0, 0], immune: [false, false], blocked: [false, false], extraPt: [false, false] };
       this.played = [[], []];
@@ -491,34 +492,109 @@
   }
 
   // ================= 電腦 AI =================
+  // 出牌：抽樣推估對手可能的出牌，算出每種出法（含剋制）的勝率，
+  // 再加上比分、召喚石像、隊長第二勝利條件與保留手牌的價值，選總分最高的出法。
+  const ALT_LEADERS = ['L08', 'L10', 'L11', 'L13'];
+  const hasCoreOf = (cat, l12) => cat !== '1' || l12;
+  const combosOf = hand => {
+    const out = [];
+    const rec = (start, cur) => { if (cur.length) out.push(cur.slice()); if (cur.length === 4) return; for (let k = start; k < hand.length; k++) { cur.push(hand[k]); rec(k + 1, cur); cur.pop(); } };
+    rec(0, []); return out;
+  };
+  const shuffled = a => { const b = a.slice(); for (let k = b.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [b[k], b[j]] = [b[j], b[k]]; } return b; };
+
   const AI = {
+    // 可調參數：分數權重、保留手牌、每多出一張的成本、L01 連勝加權
+    P: { win: 3, keep: .2, card: 0, streak: .6, K: 10 },
     goalValue(g, p, sm) {
       let v = 0; const up = g.upright(p);
-      if (p.leader === 'L11') v += sm.filter(c => c.id[0] === p.main).length;
-      if (p.leader === 'L10') { const h = { F: 0, W: 0, G: 0 }; up.forEach(s => h[s.id[0]]++); v += sm.filter(c => h[c.id[0]] < 2).length * .9 + (up.length < 7 ? sm.length * .3 : 0); }
-      if (p.leader === 'L13') { const h = { F: 0, W: 0, G: 0 }; up.forEach(s => h[s.id[0]]++); v += sm.filter(c => h[c.id[0]] % 2 === 1).length * .6; }
-      if (p.leader === 'L08') v += .4 * sm.length;
+      if (p.leader === 'L11') { const n = up.filter(s => s.id[0] === p.main).length; v += sm.filter(c => c.id[0] === p.main).length * (n >= 2 ? 1.6 : 1.1); }
+      if (p.leader === 'L10') { const h = { F: 0, W: 0, G: 0 }; up.forEach(s => h[s.id[0]]++); v += sm.filter(c => h[c.id[0]] < 2).length * 1.1 + (up.length < 7 ? sm.length * .4 : 0); }
+      if (p.leader === 'L13') { const h = { F: 0, W: 0, G: 0 }; up.forEach(s => h[s.id[0]]++); v += sm.filter(c => h[c.id[0]] % 2 === 1).length * .8 + sm.length * .2; }
+      if (p.leader === 'L08') v += .5 * sm.length;
       return v;
     },
-    order(g, p, cards) {
+    // 召喚後是否立刻達成第二勝利條件（L10、L11）
+    altAfter(g, p, sm) {
+      if (!sm.length || !g.lead(p, p.leader)) return false;
+      const up = g.upright(p).concat(sm);
+      if (p.leader === 'L11') return up.filter(s => s.id[0] === p.main).length >= 4;
+      if (p.leader === 'L10') { const c = { F: 0, W: 0, G: 0 }; up.forEach(s => c[s.id[0]]++); return up.length >= 7 && c.F >= 2 && c.W >= 2 && c.G >= 2; }
+      return false;
+    },
+    // 一手牌可能的排列：最多的屬性排左邊；兩對時兩種核心都試；L12 每種屬性都試著放最左
+    orders(g, p, cards) {
       const cnt = {}; cards.forEach(c => cnt[c.id[0]] = (cnt[c.id[0]] || 0) + 1);
-      if (g.lead(p, 'L12')) return cards.sort((a, b) => cval(b.id) - cval(a.id));
-      return cards.sort((a, b) => (cnt[b.id[0]] - cnt[a.id[0]]) || ((AI.goalValue(g, p, [b]) + cval(b.id)) - (AI.goalValue(g, p, [a]) + cval(a.id))));
+      const val = c => AI.goalValue(g, p, [c]) + cval(c.id);
+      const base = cards.slice().sort((a, b) => (cnt[b.id[0]] - cnt[a.id[0]]) || (val(b) - val(a)));
+      const cols = [...new Set(base.map(c => c.id[0]))];
+      const l12 = g.lead(p, 'L12');
+      const [, cat] = shape(base);
+      if (!(l12 || cat === '22') || cols.length < 2) return [base];
+      return cols.filter(col => !(cat === '22' && cnt[col] < 2)).map(col => base.filter(c => c.id[0] === col).concat(base.filter(c => c.id[0] !== col)));
+    },
+    evalPlay(g, i, cs) {
+      const p = g.p[i]; const [, cat] = shape(cs); const l12 = g.lead(p, 'L12');
+      const core = l12 ? colorOf(cs[0]) : coreOf(cs, cat);
+      const ctx = { core: [null, null], cat: [null, null], bonus: [0, 0], immune: [false, false] };
+      ctx.core[i] = core; ctx.cat[i] = cat;
+      return { cs, cat, core, l12, pw: g.power(i, cs, ctx) };
+    },
+    // 對手模型：從對手看不到的牌（手牌＋牌庫）抽樣成手牌，看過的牌一定在裡面
+    oppSamples(g, i, K) {
+      const j = 1 - i, o = g.p[j];
+      const known = (g.p[i].peeked || []).filter(c => o.hand.includes(c));
+      const pool = o.hand.concat(o.deck).filter(c => !known.includes(c));
+      const out = [];
+      for (let k = 0; k < K; k++) {
+        const hand = known.concat(shuffled(pool).slice(0, Math.max(0, o.hand.length - known.length)));
+        if (!hand.length) continue;
+        let best = null;
+        for (const comb of combosOf(hand)) {
+          const e = AI.evalPlay(g, j, AI.orders(g, o, comb)[0]);
+          const v = e.pw + .3 * summonList(e.cs, e.cat, e.l12).length - .25 * e.cs.length;
+          if (!best || v > best.v) best = { ...e, v };
+        }
+        out.push(best);
+      }
+      return out;
+    },
+    // 剋制方 +2：不限牌型；沒成對沒有核心（L12 例外）；L12 不會被剋
+    clash(a, b, bImmune) { return hasCoreOf(a.cat, a.l12) && hasCoreOf(b.cat, b.l12) && BEATS[a.core] === b.core && !bImmune && !b.l12 ? 2 : 0; },
+    winOdds(me, samples) {
+      let w = 0, t = 0;
+      for (const o of samples) {
+        const a = me.pw + AI.clash(me, o), b = o.pw + AI.clash(o, me);
+        if (a > b) w++; else if (a === b) t++;
+      }
+      const n = samples.length || 1;
+      return { win: w / n, tie: t / n, lose: (n - w - t) / n };
+    },
+    keepValue(rest) {
+      const cnt = {}; rest.forEach(c => cnt[c.id[0]] = (cnt[c.id[0]] || 0) + 1);
+      return AI.P.keep * Object.values(cnt).reduce((a, n) => a + (n >= 2 ? n : n * .2), 0);
     },
     bestPlay(g, i) {
-      const p = g.p[i]; const hand = p.hand; let best = null;
-      const combos = [];
-      const rec = (start, cur) => { if (cur.length) combos.push(cur.slice()); if (cur.length === 4) return; for (let k = start; k < hand.length; k++) { cur.push(hand[k]); rec(k + 1, cur); cur.pop(); } };
-      rec(0, []);
-      for (const comb of combos) {
-        const cs = AI.order(g, p, comb.slice());
-        const [, cat] = shape(cs);
-        const ctx = { core: [null, null], cat: [cat, cat], bonus: [0, 0], immune: [false, false] };
-        ctx.core[i] = g.lead(p, 'L12') ? cs[0].id[0] : coreOf(cs, cat); ctx.core[1 - i] = ctx.core[i];
-        let v = g.power(i, cs, ctx) + (Math.random() * 2 - 1);
-        const sm = summonList(cs, cat, g.lead(p, 'L12'));
-        v += sm.reduce((a, c) => a + .6 + .4 * cval(c.id), 0) + AI.goalValue(g, p, sm) - .5 * cs.length;
-        if (!best || v > best.v) best = { v, cs };
+      const p = g.p[i], o = g.opp(i);
+      const P = AI.P, samples = AI.oppSamples(g, i, P.K);
+      // 比分：自己差 1 分就贏時，這分更值錢；對手差 1 分就贏時，輸掉更痛
+      let winV = P.win * (p.score >= 3 ? 2.5 : 1), loseV = P.win * (o.score >= 3 ? 2.5 : 1);
+      // L01：贏了連勝 +1，輸了歸零，所以勝負都更重要
+      if (p.leader === 'L01') { winV += P.streak * (p.l01 + 1); loseV += P.streak * p.l01; }
+      const altW = ALT_LEADERS.includes(p.leader) ? 1.4 : 1;
+      let best = null;
+      for (const comb of combosOf(p.hand)) {
+        for (const cs of AI.orders(g, p, comb)) {
+          const e = AI.evalPlay(g, i, cs);
+          const odds = AI.winOdds(e, samples);
+          const sm = summonList(cs, e.cat, e.l12);
+          let v = odds.win * winV - odds.lose * loseV;
+          v += sm.reduce((a, c) => a + .55 + .4 * cval(c.id), 0) + AI.goalValue(g, p, sm) * altW;
+          if (AI.altAfter(g, p, sm)) v += 50;
+          v += (e.l12 ? 0 : AI.keepValue(p.hand.filter(c => !cs.includes(c)))) - P.card * cs.length;
+          v += Math.random() * .3;
+          if (!best || v > best.v) best = { v, cs };
+        }
       }
       return best.cs;
     },
@@ -534,24 +610,44 @@
       await AI.preSac(g, i);
       return AI.bestPlay(g, i);
     },
+    targetValue(g, i, s) {
+      const opp = g.opp(i);
+      return (STATIC_VAL[s.id] || .3) * (s.sealed ? 0 : 1) + (opp.leader === 'L11' && s.id[0] === opp.main ? 1.5 : 0) + (opp.leader === 'L10' ? .8 : 0) + (opp.leader === 'L13' ? .4 : 0) + (s.maint ? 1.2 : 0) - (['F06', 'G09'].includes(s.id) ? .4 : 0);
+    },
+    // 翻牌前獻祭：不擲骰子，依局面評估
     async preSac(g, i) {
-      const o = g.opp(i); const opts = g.canSacList(i, 'pre'); if (!opts.length) return;
+      const p = g.p[i], o = g.opp(i); const opts = g.canSacList(i, 'pre'); if (!opts.length) return;
       const by = id => opts.find(s => s.id === id);
       const threat = AI.threat(g, 1 - i);
+      const bestTarget = Math.max(0, ...g.upright(o).map(s => AI.targetValue(g, i, s)));
+      const oppSac = g.canSacList(1 - i).map(s => SAC_VAL[s.id] || .3);
       let st = null;
-      for (const id of ['F06', 'W04', 'G03']) if (!st && by(id) && g.upright(o).length && (threat || Math.random() < .35)) st = by(id);
-      if (!st && by('W03') && g.active(o).length && Math.random() < .3) st = by('W03');
-      if (!st && g.p[i].hand.length <= 4) for (const id of ['F02', 'W01', 'G04', 'F03', 'W05', 'G02']) if (!st && by(id) && Math.random() < .5) st = by(id);
-      if (!st && by('F08') && Math.random() < .3) st = by('F08');
+      // 1. 對手快達成勝利條件，或有值得拆的石像：先破壞
+      for (const id of ['F06', 'W04', 'G03']) if (!st && by(id) && g.upright(o).length && (threat || bestTarget >= 1.2)) st = by(id);
+      // 2. 對手有強力獻祭可用：先手讓對手本回合獻祭無效
+      if (!st && (threat || Math.max(0, ...oppSac) >= .7)) for (const id of ['W08', 'G06']) if (!st && by(id)) st = by(id);
+      // 3. 封印對手最有價值的常駐石像
+      if (!st && by('W03') && g.active(o).some(s => (STATIC_VAL[s.id] || .3) >= .9)) st = by('W03');
+      // 4. 手牌湊不出成對時補牌
+      const cnt = {}; p.hand.forEach(c => cnt[c.id[0]] = (cnt[c.id[0]] || 0) + 1);
+      const maxSame = Math.max(0, ...Object.values(cnt));
+      if (!st && maxSame <= 2) for (const id of ['F02', 'W01', 'G04', 'F03', 'W05', 'G02']) if (!st && by(id)) st = by(id);
+      if (!st && by('F08') && maxSame >= 2) st = by('F08');
+      // 5. L08：每回合盡量獻祭一座，往 5 座橫放石像前進
+      if (!st && p.leader === 'L08' && g.lead(p, 'L08')) {
+        const cheap = opts.filter(s => !['F04', 'F07', 'G07', 'F05', 'W06', 'F01', 'W02', 'G01', 'W09'].includes(s.id));
+        st = cheap.sort((a, b) => (STATIC_VAL[a.id] || .3) - (STATIC_VAL[b.id] || .3))[0] || null;
+      }
       if (st) await g.sacrifice(i, st, 'pre');
     },
     async decideSac(g, i, phase) {
-      const o = g.opp(i); const opts = g.canSacList(i); if (!opts.length) return null;
+      const p = g.p[i], o = g.opp(i); const opts = g.canSacList(i); if (!opts.length) return null;
       const by = id => opts.find(s => s.id === id);
       const ctx = g.ctx; const ev = g.evaluate(g.played, ctx);
       if (ev.w === i) {
         if (by('W09')) return by('W09');
         if (ev.pw[i] - ev.pw[1 - i] <= 2 && g.canSacList(1 - i).length) for (const id of ['W08', 'G06']) if (by(id)) return by(id);
+        if (p.leader === 'L08' && g.lead(p, 'L08')) return opts.filter(s => !['F04', 'F07', 'G07'].includes(s.id)).sort((a, b) => (STATIC_VAL[a.id] || .3) - (STATIC_VAL[b.id] || .3))[0] || null;
         return null;
       }
       for (const id of ['F01', 'W02', 'G01']) if (by(id)) {
@@ -566,10 +662,12 @@
       for (const id of ['F06', 'W04', 'G03']) if (by(id) && g.active(o).length) return by(id);
       if (by('W03') && g.active(o).length) return by('W03');
       if (by('G07') && AI.copyTarget(g, i, phase)) return by('G07');
+      if (p.leader === 'L08' && g.lead(p, 'L08')) return opts.filter(s => !['F04', 'F07', 'G07'].includes(s.id))[0] || null;
       return null;
     },
+    // 反擊：「本回合對手獻祭無效」不反擊，因為反擊也會用掉自己本回合的獻祭
     async respondCounter(g, j, effId, opts) {
-      const imp = ['F06', 'W04', 'G03', 'W09', 'G08', 'W08', 'G06', 'G07'].includes(effId) || (g.phase === 'post' && ['F01', 'W02', 'G01', 'F05', 'W06'].includes(effId));
+      const imp = ['F06', 'W04', 'G03', 'W09', 'G08', 'G07'].includes(effId) || (g.phase === 'post' && ['F01', 'W02', 'G01', 'F05', 'W06'].includes(effId));
       return imp ? opts[0] : null;
     },
     bestG08(g, i) {
@@ -591,17 +689,23 @@
       return all[0] || null;
     },
     async pick(g, i, kind, o) {
-      const p = g.p[i], opp = g.opp(i);
+      const p = g.p[i];
       const fit = c => { const cnt = {}; p.hand.forEach(x => cnt[x.id[0]] = (cnt[x.id[0]] || 0) + 1); return (cnt[c.id[0]] || 0) + cval(c.id) * .3; };
       switch (kind) {
-        case 'retrieve': return o.cards.sort((a, b) => cval(b.id) - cval(a.id)).slice(0, o.n);
+        case 'retrieve': return o.cards.sort((a, b) => fit(b) - fit(a)).slice(0, o.n);
         case 'tutor': return [o.cards.sort((a, b) => fit(b) - fit(a))[0]];
         case 'discardOne': case 'swap': return [o.cards.sort((a, b) => fit(a) - fit(b))[0]];
-        case 'l02': return o.cards.slice().sort((a, b) => fit(a) - fit(b)).filter(c => fit(c) < 1.2).slice(0, 2);
-        case 'destroy': case 'seal': {
-          const v = s => (STATIC_VAL[s.id] || .3) * (s.sealed ? 0 : 1) + (opp.leader === 'L11' && s.id[0] === opp.main ? 1.5 : 0) + (opp.leader === 'L10' ? .8 : 0) + (s.maint ? 1.2 : 0) - (['F06', 'G09'].includes(s.id) ? .4 : 0);
-          return [o.statues.sort((a, b) => v(b) - v(a))[0]];
+        case 'l02': {
+          // 潮汐交換：保留最多的屬性（兩對時兩對都留），其餘最多 2 張放回，朝三條、四條去換
+          const cnt = {}; o.cards.forEach(c => cnt[c.id[0]] = (cnt[c.id[0]] || 0) + 1);
+          const left = col => (p.deck.filter(c => c.id[0] === col).length);
+          const main = Object.keys(cnt).sort((a, b) => (cnt[b] - cnt[a]) || (left(b) - left(a)))[0];
+          if (cnt[main] >= 4) return [];
+          const pairs = Object.keys(cnt).filter(k => cnt[k] >= 2);
+          const keep = cnt[main] >= 3 ? [main] : pairs.length >= 2 ? pairs : [main];
+          return o.cards.filter(c => !keep.includes(c.id[0])).sort((a, b) => cval(a.id) - cval(b.id)).slice(0, 2);
         }
+        case 'destroy': case 'seal': return [o.statues.sort((a, b) => AI.targetValue(g, i, b) - AI.targetValue(g, i, a))[0]];
         case 'l13': return o.statues.slice().sort((a, b) => (STATIC_VAL[b.id] || .3) - (STATIC_VAL[a.id] || .3)).slice(0, o.n);
         case 'copy': { const t = AI.copyTarget(g, i, g.phase); return [o.statues.includes(t) ? t : o.statues[0]]; }
         case 'g08': { const b = AI.bestG08(g, i); return b ? { card: b.card, color: b.color } : null; }
