@@ -357,7 +357,7 @@
     switch (p.leader) {
       case 'L01': return `連勝加成 +${p.l01}`;
       case 'L08': return `已獻祭石像 ${p.statues.filter(s => !s.up).length}／5`;
-      case 'L10': return `直立 火${c.F}．水${c.W}．草${c.G}／各 2`;
+      case 'L10': return `直立 ${c.F + c.W + c.G}／7．火${c.F}．水${c.W}．草${c.G}（各 2）`;
       case 'L11': return `主色 <span class="ctag ${p.main}">${COLOR_NAME[p.main]}</span> 直立 ${c[p.main]}／4`;
       case 'L13': return `封印中 ${o.statues.filter(s => s.byL13).length}／4`;
     }

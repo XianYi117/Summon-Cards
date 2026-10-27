@@ -120,7 +120,7 @@
       if (p.lsealed) return false;
       const up = this.upright(p);
       if (p.leader === 'L08') return p.statues.filter(s => !s.up).length >= 5;
-      if (p.leader === 'L10') { const c = { F: 0, W: 0, G: 0 }; up.forEach(s => c[s.id[0]]++); return c.F >= 2 && c.W >= 2 && c.G >= 2; }
+      if (p.leader === 'L10') { const c = { F: 0, W: 0, G: 0 }; up.forEach(s => c[s.id[0]]++); return up.length >= 7 && c.F >= 2 && c.W >= 2 && c.G >= 2; }
       if (p.leader === 'L11') return up.filter(s => s.id[0] === p.main).length >= 4;
       if (p.leader === 'L13') return o.statues.filter(s => s.up && s.byL13).length >= 4;
       return false;
@@ -493,7 +493,7 @@
     goalValue(g, p, sm) {
       let v = 0; const up = g.upright(p);
       if (p.leader === 'L11') v += sm.filter(c => c.id[0] === p.main).length;
-      if (p.leader === 'L10') { const h = { F: 0, W: 0, G: 0 }; up.forEach(s => h[s.id[0]]++); v += sm.filter(c => h[c.id[0]] < 2).length * .9; }
+      if (p.leader === 'L10') { const h = { F: 0, W: 0, G: 0 }; up.forEach(s => h[s.id[0]]++); v += sm.filter(c => h[c.id[0]] < 2).length * .9 + (up.length < 7 ? sm.length * .3 : 0); }
       if (p.leader === 'L13') { const h = { F: 0, W: 0, G: 0 }; up.forEach(s => h[s.id[0]]++); v += sm.filter(c => h[c.id[0]] % 2 === 1).length * .6; }
       if (p.leader === 'L08') v += .4 * sm.length;
       return v;
@@ -523,7 +523,7 @@
     threat(g, j) {
       const p = g.p[j]; const up = g.upright(p);
       if (p.leader === 'L11') return up.filter(s => s.id[0] === p.main).length >= 3;
-      if (p.leader === 'L10') { const c = { F: 0, W: 0, G: 0 }; up.forEach(s => c[s.id[0]]++); return Math.min(2, c.F) + Math.min(2, c.W) + Math.min(2, c.G) >= 5; }
+      if (p.leader === 'L10') { const c = { F: 0, W: 0, G: 0 }; up.forEach(s => c[s.id[0]]++); return Math.min(2, c.F) + Math.min(2, c.W) + Math.min(2, c.G) >= 5 && up.length >= 6; }
       if (p.leader === 'L08') return p.statues.filter(s => !s.up).length >= 4;
       if (p.leader === 'L13') return up.length >= 5;
       return p.score >= 3;

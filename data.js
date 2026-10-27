@@ -43,7 +43,7 @@ const LEADERS = {
   L07: { name: '暗影偵察者', color: 'N', race: '影', skill: '暗中窺探', text: '出牌前：看對手 2 張手牌' },
   L08: { name: '無冕暴君', color: 'N', race: '魔', skill: '孤家寡人', text: '5 座已獻祭石像：獲勝' },
   L09: { name: '豐饒掌管者', color: 'N', race: '矮靈', skill: '餘裕之手', text: '【補牌】補至 6 張' },
-  L10: { name: '三界召喚師', color: 'N', race: '靈體', skill: '三界契約', text: '火水草直立石像各 2 座：獲勝' },
+  L10: { name: '三界召喚師', color: 'N', race: '靈體', skill: '三界契約', text: '直立石像 7 座，且火水草各至少 2 座：獲勝' },
   L11: { name: '冥火貓妖', color: 'N', race: '獸', skill: '主色號令', text: '選主色；主色石像 2 座：戰力 +2；4 座：獲勝' },
   L12: { name: '幻術蠱王', color: 'N', race: '蟲', skill: '變色之術', text: '雜色越強（ABC 5、AABC 6）；最左張決定屬性，剋制不限牌型、不會被剋；沒成對時召喚最左 1 張' },
   L13: { name: '封魔者', color: 'N', race: '人', skill: '雙界封印', text: '整理時：每 2 座同屬性直立石像封印對手 1 座（選定後固定）；封印 4 座：獲勝' },
