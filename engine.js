@@ -200,7 +200,7 @@
         p.statues.forEach(m => { if (m.maint && !o.statues.some(t => t.uid === m.maint && t.byL13)) m.maint = null; });
       }
     }
-    // 封魔者被封印的回合，雙界封印暫時失效
+    // 封魔者被 G05 封印時（到判定勝負為止），雙界封印暫時失效
     syncL13() {
       for (const i of [0, 1]) {
         const p = this.p[i], o = this.opp(i);
@@ -359,7 +359,7 @@
         }
         case 'W03': {
           const tg = o.statues.filter(s => s.up && !s.sealed);
-          if (tg.length) { const [t] = await this.ctrl[i].pick(this, i, 'seal', { statues: tg, n: 1, title: '選擇要封印的對手石像（本回合）' }); if (t) { t.sealed = true; t.tmpSeal = true; this.note(`封印 ${CARDS[t.id].name}`, i); await this.ui.ev('seal', { i }); } }
+          if (tg.length) { const [t] = await this.ctrl[i].pick(this, i, 'seal', { statues: tg, n: 1, title: '選擇要封印的對手石像（到判定勝負）' }); if (t) { t.sealed = true; t.tmpSeal = true; this.note(`封印 ${CARDS[t.id].name}`, i); await this.ui.ev('seal', { i }); } }
           break;
         }
         case 'W07': {
@@ -368,7 +368,7 @@
         }
         case 'W08': case 'G06': ctx.blocked[1 - i] = true; this.note('本回合對手不能獻祭', i); break;
         case 'W09': ctx.extraPt[i] = true; break;
-        case 'G05': o.lsealed = true; this.syncL13(); this.note('封印對手隊長到回合結束', i); await this.ui.ev('seal', { i }); break;
+        case 'G05': o.lsealed = true; this.syncL13(); this.note('封印對手隊長到判定勝負', i); await this.ui.ev('seal', { i }); break;
         case 'G07': {
           const tg = [...this.p[i].statues, ...o.statues].filter(s => s.up && !s.sealed && COPYABLE(s.id) && !(id === 'G08' && phase !== 'post'));
           const ok = tg;
@@ -458,6 +458,11 @@
       }
       this.note(ev.w === null ? `戰力 ${ev.pw[0]} 對 ${ev.pw[1]}，平手` : `戰力 ${ev.pw[0]} 對 ${ev.pw[1]}，${ev.w === 0 ? '我方' : '對手'}得 ${gain} 分`);
       await this.ui.ev('settle', { ...ev, gain });
+      // 獻祭帶來的一次性封印（G05 封印隊長、W03 封印石像）只到判定勝負為止，之後恢復
+      // L13 的雙界封印是持續封印，不在這裡解除
+      this.p.forEach(p => { p.lsealed = false; p.statues.forEach(s => { if (s.tmpSeal) { s.tmpSeal = false; s.sealed = false; } }); });
+      this.syncL13();
+      await this.ui.ev('unseal', {});
       // 召喚
       this.phase = 'summon';
       for (const i of (ev.w !== null ? [ev.w, 1 - ev.w] : order)) {
@@ -470,7 +475,6 @@
         if (newS.length) this.note(`召喚石像 ${newS.map(s => CARDS[s.id].name).join('、')}`, i);
         await this.ui.ev('summon', { i, statues: newS, rest: cards.filter(c => !sm.includes(c)) });
       }
-      this.p.forEach(p => p.statues.forEach(s => { if (s.tmpSeal) { s.tmpSeal = false; s.sealed = false; } }));
       this.p.forEach(p => [...p.hand, ...p.disc, ...p.deck].forEach(c => { delete c.as; })); // G08 的變換只到回合結束
       this.phase = 'end';
       await this.l13Cleanup();

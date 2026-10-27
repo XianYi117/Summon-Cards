@@ -191,11 +191,11 @@
 <h3>G08 花冠幻術師</h3><p>出牌階段獻祭：變換 1 張手牌的屬性（對手看不到是哪一張）；翻牌後獻祭：變換 1 張自己出戰牌的屬性。效果到回合結束，變成石像後恢復原本屬性。</p>
 <h3>4. 獻祭的順序</h3><p>W08、G06（本回合對手獻祭無效）可以主動先獻祭，也可以在對手獻祭時回應，效果等同【反擊】。主動先獻祭時，對手可以反擊。</p><ol><li>翻牌前（補牌後、出牌時）雙方隨時可以獻祭；翻牌後進入獻祭時間，畫面會顯示雙方目前戰力。</li><li>獻祭時間從起始玩家開始，雙方輪流宣告「獻祭」或「跳過」。</li><li>跳過不代表放棄，對手之後獻祭時，你還是可以回應。</li><li>雙方連續都跳過，獻祭時間就結束。</li></ol>
 <h3>5. 石像的狀態</h3><div class="tbl"><table><tr><th>狀態</th><th>擺法</th><th>技能</th><th>算進屬性數量</th></tr><tr><td>直立</td><td>直放</td><td>啟動有效，可以獻祭</td><td>算</td></tr><tr><td>已獻祭</td><td>橫放</td><td>沒有任何技能</td><td>不算（只算獻祭數量）</td></tr><tr><td>封印中</td><td>直放</td><td>啟動無效，也不能獻祭</td><td>算</td></tr></table></div>
-<ul><li><b>破壞</b>：被破壞的石像進棄牌區，之後會洗回牌庫。</li><li><b>封印通則</b>：被封印的能力在封印期間完全不生效，有利和不利的部分都一樣；累積的數值保留不變。</li><li><b>L01 被封印</b>：封印只作用在戰力計算，該回合連勝加成無效；判定勝負時封印效果已結束，所以贏了照樣 +1、輸了照樣歸零。</li></ul>
+<ul><li><b>破壞</b>：被破壞的石像進棄牌區，之後會洗回牌庫。</li><li><b>封印通則</b>：被封印的能力在封印期間完全不生效，有利和不利的部分都一樣；累積的數值保留不變。封印依來源分兩種：</li><li><b>一次性封印</b>（獻祭效果，例如 G05 封印隊長、W03 封印石像）：持續到判定勝負為止，之後立刻恢復。所以 L01 被封印的回合沒有連勝加成，但贏了照樣 +1、輸了照樣歸零；召喚石像後的隊長勝利條件、整理階段的能力也都照常。</li><li><b>持續封印</b>（L13 雙界封印，以及之後的啟動效果封印）：選定後綁定，直到負責維持的石像或被封印的石像被破壞才解除。</li></ul>
 <h3>6. 效果處理</h3><ul><li>每回合觸發的啟動效果，都在補牌後處理。雙方同時觸發時，起始玩家先處理。</li><li>技能帶來的額外抽牌不受 5 張限制，但下回合補牌仍以 5 張為準。</li><li>獻祭得到的能力只持續本回合。</li></ul>
 <h3>7. 勝利的細節</h3><ul><li>隊長的特殊勝利條件一達成，就立刻獲勝。</li><li>需要指定顏色才能獲勝的隊長（L11 冥火貓妖），開局要<b>宣告</b>主色是哪個屬性，雙方都看得到。</li><li>雙方同時達成勝利條件時，進入搶 1 分加賽。</li></ul>
 <h3>8. 隊長說明</h3><div class="tbl"><table><tr><th>隊長</th><th>說明</th></tr>${leaderIds.map(id => `<tr><td>${id} ${LEADERS[id].name}</td><td>${LEADERS[id].text}</td></tr>`).join('')}</table></div>
-<p>L13 封魔者：在整理階段，每 2 座自己的同屬性直立石像（還沒在維持封印的）可以封印 1 座對手直立石像。封印選定後就固定，不能更換；之後的整理只能用新的成對石像追加封印。負責維持的 2 座石像不能獻祭；維持的石像或被封印的石像被破壞，該封印就解除，之後可以再封印新的目標。封魔者被封印的回合，雙界封印暫時失效。同時封印 4 座獲勝。</p>
+<p>L13 封魔者：在整理階段，每 2 座自己的同屬性直立石像（還沒在維持封印的）可以封印 1 座對手直立石像。封印選定後就固定，不能更換；之後的整理只能用新的成對石像追加封印。負責維持的 2 座石像不能獻祭；維持的石像或被封印的石像被破壞，該封印就解除，之後可以再封印新的目標。封魔者被 G05 封印時，雙界封印暫時失效到判定勝負為止，整理階段照常執行。同時封印 4 座獲勝。</p>
 <p>L12 專屬戰力：A、AA、AAA、AAAA＝1；AB、AAB、AAAB＝3；AABB＝4；ABC＝5；AABC＝6。對手不能剋制 L12。</p>
 </details>`;
   }
@@ -366,7 +366,7 @@
   function renderSide(i) {
     const p = G.p[P(i)], box = i === 0 ? $('#sideMe') : $('#sideFoe'); box.innerHTML = '';
     const pl = el('div', 'pl ' + (i === 0 ? 'me' : 'foe') + (p.lsealed ? ' sealedL' : ''));
-    const c = cardEl(p.leader); bindHover(c, p.leader, p.lsealed ? '<br><b>本回合被封印</b>' : ''); pl.appendChild(c);
+    const c = cardEl(p.leader); bindHover(c, p.leader, p.lsealed ? '<br><b>被封印（到判定勝負）</b>' : ''); pl.appendChild(c);
     const g = goalText(p);
     pl.appendChild(el('div', '', `<div class="pn">${SN(i)}．${LEADERS[p.leader].name}</div>
       <div class="ps">得分 <b>${p.score}</b>／4<br>牌庫 <b>${p.deck.length}</b>．棄牌 <b>${p.disc.length}</b>${i === 1 ? `．手牌 <b>${p.hand.length}</b>` : ''}</div>
@@ -457,7 +457,7 @@
   function effList(idx, kind) {
     const p = G.p[idx], c = G.ctx, L = LEADERS[p.leader], out = [];
     if (kind === 'act') {
-      out.push({ t: 'lead', h: `${p.leader} ${L.name}（隊長）`, d: L.text + (p.leader === 'L01' ? `（目前 +${p.l01}）` : '') + (p.leader === 'L11' ? `（主色 <span class="ctag ${p.main}">${COLOR_NAME[p.main]}</span>）` : ''), off: p.lsealed ? '本回合被封印' : '' });
+      out.push({ t: 'lead', h: `${p.leader} ${L.name}（隊長）`, d: L.text + (p.leader === 'L01' ? `（目前 +${p.l01}）` : '') + (p.leader === 'L11' ? `（主色 <span class="ctag ${p.main}">${COLOR_NAME[p.main]}</span>）` : ''), off: p.lsealed ? '被封印（到判定勝負）' : '' });
       if (c) {
         if (c.bonus[idx]) out.push({ t: 'buff', h: '本回合', d: `戰力 ${c.bonus[idx] > 0 ? '+' : ''}${c.bonus[idx]}` });
         if (c.immune[idx]) out.push({ t: 'buff', h: '本回合', d: '不受剋制' });
@@ -580,6 +580,7 @@
         else await banner('對手查看了你 2 張手牌', 900);
         break;
       case 'seal': renderAll(); await wait(450); break;
+      case 'unseal': renderAll(); break;
       case 'sacrifice':
         if (rec.start && !spectating && G.phase === 'choose') rec.push({ k: 'presac', who: d.i, uid: d.statue.uid });
         sacTurn.add(d.statue.uid); sacFx.add(d.statue.uid); renderAll(); flashStatue(d.statue.uid);
