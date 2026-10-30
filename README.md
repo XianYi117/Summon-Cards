@@ -2,8 +2,9 @@
 
 雙人卡牌對戰網頁遊戲（版本 vj.1030.0，角色卡 108 種）。
 
-**立即遊玩：** https://xianyi117.github.io/Summon-Cards/\
-**卡牌構築・列印輸出：** https://xianyi117.github.io/Summon-Cards/builder/
+**立即遊玩：** [https://xianyi117.github.io/Summon-Cards/](https://xianyi117.github.io/Summon-Cards/)
+
+**卡牌構築・列印輸出：** [https://xianyi117.github.io/Summon-Cards/builder/](https://xianyi117.github.io/Summon-Cards/builder/)
 
 ## 玩法
 
