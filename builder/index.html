@@ -109,7 +109,7 @@ aside label input,aside label select{color:var(--text);font-size:14px}
 .sheets{display:grid;justify-content:center;gap:24px}
 .sheet{width:210mm;height:297mm;background:#fff;position:relative;box-shadow:0 6px 30px #000a;overflow:hidden}
 .sheet img{position:absolute;width:63mm;height:88mm;display:block}
-.sheet .cut{position:absolute;background:#888}
+.sheet .cut{position:absolute;background:#333;z-index:1}
 .sheet .pno{position:absolute;bottom:5mm;right:8mm;font-size:9pt;color:#999}
 @media (max-width:860px){
   #build{grid-template-columns:1fr}
@@ -193,14 +193,13 @@ aside label input,aside label select{color:var(--text);font-size:14px}
   <div class="pset noprint">
     <label><input type="checkbox" id="pLeader" checked> 含隊長卡</label>
     <label>每張 <input type="number" id="pCopies" min="1" max="9" value="1"> 份</label>
-    <label>卡片間距 <select id="pGap"><option value="0">0 mm（連在一起）</option><option value="2" selected>2 mm</option><option value="4">4 mm</option></select></label>
-    <label><input type="checkbox" id="pCut" checked> 裁切線</label>
+    <label><input type="checkbox" id="pCut" checked> 裁切格線</label>
     <span id="pInfo" style="color:var(--muted)"></span>
     <span style="flex:1"></span>
     <button class="btn" id="doPrint">列印</button>
     <button class="btn primary" id="doPdf">下載 PDF</button>
   </div>
-  <p class="hint noprint" style="margin:-6px 0 14px">卡片尺寸 63×88 mm（標準卡牌），每頁 3×3。列印時請選「實際大小／100%」，不要「縮放至頁面大小」。</p>
+  <p class="hint noprint" style="margin:-6px 0 14px">卡片尺寸 63×88 mm（標準卡牌），每頁 3×3，卡片之間沒有間隔，沿格線裁切即可（直、橫各 4 刀）。列印時請選「實際大小／100%」，不要「縮放至頁面大小」。</p>
   <div class="sheets" id="sheets"></div>
 </section>
 
@@ -404,7 +403,7 @@ aside label input,aside label select{color:var(--text);font-size:14px}
     return out;
   }
   function layout() {
-    const g = +$('#pGap').value, x0 = (MM.pw - 3 * MM.cw - 2 * g) / 2, y0 = (MM.ph - 3 * MM.ch - 2 * g) / 2;
+    const g = 0, x0 = (MM.pw - 3 * MM.cw - 2 * g) / 2, y0 = (MM.ph - 3 * MM.ch - 2 * g) / 2;
     const pos = []; for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) pos.push([x0 + c * (MM.cw + g), y0 + r * (MM.ch + g)]);
     // 裁切線：畫在版面外側的白邊上（不壓到卡）
     const xs = [], ys = [];
@@ -420,21 +419,22 @@ aside label input,aside label select{color:var(--text);font-size:14px}
     if (!ids.length) { box.appendChild(el('div', 'empty', '還沒有勾選卡片。回到「構築／總覽」勾選要列印的卡。')); return; }
     for (let p = 0; p < pages; p++) {
       const sh = el('div', 'sheet');
-      if ($('#pCut').checked) {
-        const len = 5;
-        for (const x of L.xs) { sh.appendChild(cut(x, L.y0 - len - 1, .2, len)); sh.appendChild(cut(x, L.y1 + 1, .2, len)); }
-        for (const y of L.ys) { sh.appendChild(cut(L.x0 - len - 1, y, len, .2)); sh.appendChild(cut(L.x1 + 1, y, len, .2)); }
-      }
       ids.slice(p * 9, p * 9 + 9).forEach((id, k) => {
         const im = el('img'); im.src = img(id, true); im.alt = id;
         im.style.left = L.pos[k][0] + 'mm'; im.style.top = L.pos[k][1] + 'mm'; sh.appendChild(im);
       });
+      if ($('#pCut').checked) {
+        // 格線畫在卡片邊界上，並往外延伸 5 mm，方便對齊裁紙刀
+        const ext = 5, w = .2;
+        for (const x of L.xs) sh.appendChild(cut(x - w / 2, L.y0 - ext, w, L.y1 - L.y0 + ext * 2));
+        for (const y of L.ys) sh.appendChild(cut(L.x0 - ext, y - w / 2, L.x1 - L.x0 + ext * 2, w));
+      }
       sh.appendChild(el('div', 'pno', `召喚．${esc(st.name || '自訂')}．${p + 1}/${pages}`));
       box.appendChild(sh);
     }
     function cut(x, y, w, h) { const d = el('div', 'cut'); Object.assign(d.style, { left: x + 'mm', top: y + 'mm', width: w + 'mm', height: h + 'mm' }); return d; }
   }
-  ['#pLeader', '#pCopies', '#pGap', '#pCut'].forEach(s => $(s).oninput = $(s).onchange = renderPrint);
+  ['#pLeader', '#pCopies', '#pCut'].forEach(s => $(s).oninput = $(s).onchange = renderPrint);
   $('#doPrint').onclick = () => window.print();
 
   // 卡圖轉 JPEG（PDF 可直接內嵌 JPEG，不需要外部函式庫）
@@ -474,8 +474,8 @@ aside label input,aside label select{color:var(--text);font-size:14px}
     pages.forEach((pg, i) => {
       const [pid, cid] = pageIds[i];
       let c = '';
-      if (pg.lines.length) { c += '0.5 G 0.57 w\n'; for (const [x1, y1, x2, y2] of pg.lines) c += `${pt(x1)} ${pt(PH - y1)} m ${pt(x2)} ${pt(PH - y2)} l S\n`; }
       for (const it of pg.items) c += `q ${pt(it.w)} 0 0 ${pt(it.h)} ${pt(it.x)} ${pt(PH - it.y - it.h)} cm /${names[it.img]} Do Q\n`;
+      if (pg.lines.length) { c += '0.2 G 0.57 w\n'; for (const [x1, y1, x2, y2] of pg.lines) c += `${pt(x1)} ${pt(PH - y1)} m ${pt(x2)} ${pt(PH - y2)} l S\n`; }
       const used = [...new Set(pg.items.map(it => it.img))];
       begin(pid); push(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pt(210)} ${pt(297)}] /Resources << /XObject << ${used.map(k => `/${names[k]} ${imgIds[k]} 0 R`).join(' ')} >> >> /Contents ${cid} 0 R >>\nendobj\n`);
       const cb = enc.encode(c);
@@ -496,9 +496,9 @@ aside label input,aside label select{color:var(--text);font-size:14px}
       for (let i = 0; i < uniq.length; i++) { btn.textContent = `處理卡圖 ${i + 1}/${uniq.length}`; images[uniq[i]] = await toJpeg(img(uniq[i], true)); }
       const lines = [];
       if ($('#pCut').checked) {
-        const len = 5;
-        for (const x of L.xs) lines.push([x, L.y0 - len - 1, x, L.y0 - 1], [x, L.y1 + 1, x, L.y1 + len + 1]);
-        for (const y of L.ys) lines.push([L.x0 - len - 1, y, L.x0 - 1, y], [L.x1 + 1, y, L.x1 + len + 1, y]);
+        const ext = 5;
+        for (const x of L.xs) lines.push([x, L.y0 - ext, x, L.y1 + ext]);
+        for (const y of L.ys) lines.push([L.x0 - ext, y, L.x1 + ext, y]);
       }
       const pages = [];
       for (let p = 0; p * 9 < ids.length; p++)
