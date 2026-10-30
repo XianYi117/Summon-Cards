@@ -106,7 +106,7 @@
       dk.appendChild(b);
     }
     inf.appendChild(dk);
-    const bl = el('a', 'btn ghost small', '＋ 卡牌構築（自訂牌組）'); bl.href = '../builder/'; bl.style.justifySelf = 'start'; inf.appendChild(bl);
+    const bl = el('button', 'btn ghost small', '＋ 卡牌構築（自訂牌組）'); bl.onclick = () => { location.href = '../builder/'; }; bl.style.justifySelf = 'start'; inf.appendChild(bl);
     const ok = s.leader && s.deck && (s.leader !== 'L11' || s.main);
     const act = el('div', 'pick-actions');
     const next = el('button', 'btn primary', net.on ? (net.myCfg ? '已準備，等待對手…' : '準備完成') : isFoe ? '確認對手' : '下一步'); next.disabled = !ok || (net.on && !!net.myCfg);
