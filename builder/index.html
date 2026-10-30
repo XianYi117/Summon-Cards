@@ -102,6 +102,7 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
 .decklist{display:grid;gap:6px;max-height:50vh;overflow:auto}
 .decklist div{display:flex;align-items:center;gap:8px;background:#0d1016;border:1px solid var(--line);border-radius:6px;padding:7px 10px}
 .decklist div.cur{border-color:var(--gold)}
+.dlg h4{margin:10px 0 4px;font-size:14px}.dlg h4 small{font-weight:normal;opacity:.7;margin-left:6px}#sharedList{max-height:28vh}
 .decklist span{flex:1;min-width:0}
 .decklist small{color:var(--muted);display:block}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2a2518;border:1px solid var(--gold);padding:8px 18px;border-radius:6px;z-index:99;transition:opacity .3s}
@@ -203,6 +204,7 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
 
 <script src="../shared/data.js"></script>
 <script src="../shared/decks.js"></script>
+<script src="../shared/cloud.js"></script>
 <script>
 (function () {
   const $ = s => document.querySelector(s);
@@ -321,11 +323,24 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
     const list = loadMyDecks();
     // 編號：新牌組接在預組與既有牌組之後；覆蓋原牌組時沿用原編號
     if (asNew || st.deckIdx < 0 || !list[st.deckIdx]) { st.no = nextDeckNo(list); list.push(current()); st.deckIdx = list.length - 1; }
-    else { st.no = list[st.deckIdx].no || nextDeckNo(list); list[st.deckIdx] = current(); }
+    else { st.no = list[st.deckIdx].no || nextDeckNo(list); list[st.deckIdx] = { ...current(), cloud: list[st.deckIdx].cloud || 0 }; }
     if (!saveMyDecks(list)) { toast('瀏覽器不允許儲存'); return false; }
+    upload(st.deckIdx);
     renderSide(); persistDraft(); toast(deckProblems(sorted()).length ? `已儲存「${deckTitle(current())}」（張數還不符合規則，遊戲裡暫時不會出現）` : `已儲存「${deckTitle(current())}」，遊戲的牌組選單裡可以選`);
     return true;
   }
+  // 共享牌組：符合規則的牌組自動上傳，編號改用資料庫統一發的號碼
+  function upload(idx) {
+    if (!Cloud.on) return;
+    const d = loadMyDecks()[idx]; if (!d || deckProblems(d.cards).length) return;
+    Cloud.saveDeck(d).then(no => {
+      const l = loadMyDecks(), x = l[idx]; if (!x || x.updated !== d.updated) return;
+      const moved = x.no !== no; x.no = no; x.cloud = 1; saveMyDecks(l);
+      if (st.deckIdx === idx) st.no = no;
+      renderSide(); persistDraft(); toast(moved ? `已上傳到玩家分享，編號為 ${deckTitle(x)}` : `已同步到玩家分享`);
+    }).catch(() => toast('暫時連不上共享資料庫，牌組先存在這台裝置，之後會自動上傳'));
+  }
+  if (Cloud.on) Cloud.syncMine().then(ch => { if (ch) { renderSide(); toast('本機牌組已上傳到玩家分享'); } }).catch(() => { });
   const gameUrl = () => new URL(`../index.html#deck=${deckCode(current())}&name=${encodeURIComponent(current().name)}`, location.href).href;
   const builderUrl = () => new URL(`./#deck=${deckCode(current())}&name=${encodeURIComponent(current().name)}`, location.href).href;
   function dialog(html, onOk) {
@@ -374,6 +389,9 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
     const blob = new Blob([JSON.stringify(loadMyDecks().length ? loadMyDecks() : [current()], null, 2)], { type: 'application/json' });
     const a = el('a'); a.href = URL.createObjectURL(blob); a.download = '召喚_我的牌組.json'; a.click(); URL.revokeObjectURL(a.href);
   }
+  const sharedRows = l => { const mine = new Set(loadMyDecks().filter(x => x.cloud).map(x => x.no)); l = l.filter(x => !x.mine && !mine.has(x.no)); return l.length ? l.map(x => {
+      const c = { F: 0, W: 0, G: 0 }; x.cards.forEach(id => CARDS[id] && c[id[0]]++);
+      return `<div><span><b>${esc(deckTitle(x))}</b><small>火 ${c.F}．水 ${c.W}．草 ${c.G}${LEADERS[x.leader] ? `．${esc(LEADERS[x.leader].name)}` : ''}</small></span><button class="btn small" data-sh="${x.no}">載入</button></div>`; }).join('') : '<p class="hint">目前沒有其他玩家分享的牌組。</p>'; };
   $('#loadBtn').onclick = function openDecks() {
     const list = loadMyDecks();
     const { d, close } = dialog(`<h3>我的牌組</h3>
@@ -382,10 +400,11 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
         return `<div class="${i === st.deckIdx ? 'cur' : ''}"><span><b>${esc(deckTitle(x))}</b><small>火 ${c.F}．水 ${c.W}．草 ${c.G}．共 ${x.cards.length} 張${LEADERS[x.leader] ? `．${esc(LEADERS[x.leader].name)}` : ''}</small></span>
           <button class="btn small" data-load="${i}">載入</button><button class="btn small" data-del="${i}">刪除</button></div>`;
       }).join('') : '<p class="hint">還沒有儲存的牌組。</p>'}</div>
+      ${Cloud.on ? `<h4>玩家分享<small>（別人上傳的牌組，載入後另存成自己的）</small></h4><div class="decklist" id="sharedList">${sharedRows(Cloud.cached())}</div>` : ''}
       <label>匯入：貼上牌組代碼、分享連結、卡號清單或 JSON<textarea id="iCode" placeholder="L03.F01.F03…"></textarea></label>
       <div class="btns"><button class="btn" data-ok>匯入</button><button class="btn" id="dNew">開新牌組</button><button class="btn" data-close>關閉</button></div>`, d => {
         const raw = d.querySelector('#iCode').value; let deck;
-        try { const j = JSON.parse(raw); if (Array.isArray(j)) { saveMyDecks(loadMyDecks().concat(j.filter(x => x && Array.isArray(x.cards)).map(x => ({ ...x, no: 0 })))); loadMyDecks(); renderSide(); toast(`已匯入 ${j.length} 副牌組`); return; } deck = j; } catch { }
+        try { const j = JSON.parse(raw); if (Array.isArray(j)) { saveMyDecks(loadMyDecks().concat(j.filter(x => x && Array.isArray(x.cards)).map(x => ({ ...x, no: 0, cloud: 0 })))); loadMyDecks(); renderSide(); toast(`已匯入 ${j.length} 副牌組`); return; } deck = j; } catch { }
         if (!deck) { const h = raw.includes('deck=') ? new URLSearchParams(raw.slice(raw.indexOf('#') + 1)) : null; deck = { ...parseDeckCode(h ? h.get('deck') : raw), name: h && h.get('name') || '' }; }
         if (!deck.cards || !deck.cards.length) { toast('找不到卡牌編號'); return false; }
         loadDeck(deck, -1); toast(`已匯入 ${deck.cards.length} 張`);
@@ -393,9 +412,11 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
     d.querySelectorAll('[data-load]').forEach(b => b.onclick = () => { const i = +b.dataset.load; loadDeck(loadMyDecks()[i], i); close(); toast('已載入'); });
     d.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
       const i = +b.dataset.del, l = loadMyDecks(); if (!confirm(`刪除「${deckTitle(l[i])}」？`)) return;
-      l.splice(i, 1); saveMyDecks(l); if (st.deckIdx === i) st.deckIdx = -1; else if (st.deckIdx > i) st.deckIdx--;
+      if (l[i].cloud && Cloud.on) Cloud.deleteDeck(l[i].no); l.splice(i, 1); saveMyDecks(l); if (st.deckIdx === i) st.deckIdx = -1; else if (st.deckIdx > i) st.deckIdx--;
       renderSide(); persistDraft(); close(); openDecks();
     });
+    const bindShared = () => d.querySelectorAll('[data-sh]').forEach(b => b.onclick = () => { const x = Cloud.cached().find(y => y.no === +b.dataset.sh); if (!x) return; loadDeck({ ...x, name: x.name, no: 0 }, -1); close(); toast(`已載入「${deckTitle(x)}」，儲存後會變成你的新牌組`); });
+    if (Cloud.on) { bindShared(); Cloud.listDecks().then(l => { const e = d.querySelector('#sharedList'); if (e) { e.innerHTML = sharedRows(l); bindShared(); } }).catch(() => { }); }
     d.querySelector('#dNew').onclick = () => { loadDeck({}, -1); close(); };
   };
   $('#clear').onclick = () => { if (st.sel.size && !confirm('清空目前勾選的卡？')) return; st.sel.clear(); st.leader = ''; refresh(); };

@@ -57,6 +57,7 @@
   const leaderIds = Object.keys(LEADERS);
   // 隨機隊長只從這些隊長中挑（L10～L13 調整中，暫不參與隨機；仍可手動選）
   const RANDOM_LEADERS = leaderIds.filter(id => !['L10', 'L11', 'L12', 'L13'].includes(id));
+  window.onCloudDecks = () => { if (!$('#pick').hidden) renderPick(); };
   function renderPick() {
     const s = cfg[pickStep], isFoe = pickStep === 'foe';
     $('#pickStep').textContent = net.on ? `連線對戰．房間 ${net.code}` : isFoe ? 'STEP 2 / 2' : 'STEP 1 / 2';
@@ -92,7 +93,7 @@
       }
     }
     inf.appendChild(el('div', 'lab', '牌組'));
-    for (const [tier, title] of [['初階', '初階預組'], ['進階', '進階預組'], ['個人', '個人構築'], ['其他', '其他']]) {
+    for (const [tier, title] of [['初階', '初階預組'], ['進階', '進階預組'], ['個人', '個人構築'], ['分享', '玩家分享'], ['其他', '其他']]) {
       const keys = Object.keys(DECKS).filter(k => (DECKS[k].tier || '其他') === tier);
       if (!keys.length) continue;
       inf.appendChild(el('div', 'dtier', title));
@@ -682,7 +683,7 @@
   }
   async function showResult(d) {
     const w = d.winner; const howTxt = { points: '先拿到 4 分', leader: '達成隊長勝利條件', sudden: '加賽搶下 1 分', end: '回合上限，比較分數' }[d.how] || '';
-    if (!tEnd) { tEnd = Date.now(); clearInterval(clockT); tickClock(); if (!spectating) saveHistory(w === ME ? 0 : w === 1 - ME ? 1 : -1, d.how); }
+    if (!tEnd) { tEnd = Date.now(); clearInterval(clockT); tickClock(); if (!spectating) { saveHistory(w === ME ? 0 : w === 1 - ME ? 1 : -1, d.how); reportResult(w); } }
     const m = $('#modal'), b = $('#mbox'); b.innerHTML = '';
     if (spectating) {
       b.appendChild(el('div', 'result win', w === 0 ? '玩家 A 勝利' : w === 1 ? '玩家 B 勝利' : '平手'));
@@ -707,6 +708,14 @@
     r.append(again, home, lg); b.appendChild(r); m.hidden = false;
   }
   function loadHistory() { try { return JSON.parse(localStorage.getItem('summon_hist') || '[]'); } catch { return []; } }
+  // 對戰紀錄送雲端（沒設定雲端就什麼都不做）。連線對戰只由房主送，避免重複
+  function reportResult(w) {
+    if (typeof Cloud === 'undefined' || !Cloud.on || (net.on && !net.host)) return;
+    const side = i => i === ME ? cfg.me : cfg.foe;
+    const label = s => s.deckLabel || (DECKS[s.deck] || {}).label || s.deck || '';
+    Cloud.report({ mode: net.on ? 'online' : 'ai', build: BUILD, deck0: label(side(0)), leader0: side(0).realLeader || side(0).leader, deck1: label(side(1)), leader1: side(1).realLeader || side(1).leader,
+      winner: w === 0 || w === 1 ? w : -1, turns: G.turn, s0: G.p[0].score, s1: G.p[1].score });
+  }
   function saveHistory(w, how) {
     const d = new Date(), date = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     const h = [{ date, w, how, score: `${G.p[ME].score}:${G.p[1 - ME].score}`, online: !!net.on, turns: G.turn, ms: tEnd - t0 }, ...loadHistory()].slice(0, 20);
@@ -1049,6 +1058,8 @@
       }, 1000);
     },
   };
+  // 有雲端時用 Cloudflare TURN 中繼（手機網路、學校公司網路也連得上）；拿不到就用 PeerJS 預設
+  const peerOpts = () => typeof Cloud !== 'undefined' ? Cloud.peerOptions() : Promise.resolve(undefined);
   function loadPeer() {
     if (window.Peer) return Promise.resolve();
     return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = PEER_SRC; sc.onload = res; sc.onerror = () => rej(new Error('load')); document.head.appendChild(sc); });
@@ -1057,9 +1068,10 @@
   async function createRoom() {
     onlineMsg('建立房間中…');
     try { await loadPeer(); } catch { onlineMsg('連線元件載入失敗，請確認網路後再試', true); return; }
+    const po = await peerOpts();
     const code = String(Math.floor(1000 + Math.random() * 9000)) + 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random() * 24)];
     net.close(); net.on = true; net.host = true; net.code = code; net.game = 0;
-    const peer = new window.Peer(ROOM_PREFIX + code); net.peer = peer;
+    const peer = new window.Peer(ROOM_PREFIX + code, po); net.peer = peer;
     peer.on('open', () => { $('#roomCode').textContent = code; $('#roomBox').hidden = false; onlineMsg('把房間代碼告訴朋友，等待對手加入…'); });
     peer.on('connection', conn => {
       if (net.reconn && (!net.conn || !net.conn.open)) { net.bind(conn); return; } // 立刻開始聽，等對方送 rejoin
@@ -1074,8 +1086,9 @@
     if (!/^\d{4}[A-Z]$/.test(code)) { onlineMsg('請輸入 4 個數字＋1 個英文字母的房間代碼，例如 3842K', true); return; }
     onlineMsg('連線中…');
     try { await loadPeer(); } catch { onlineMsg('連線元件載入失敗，請確認網路後再試', true); return; }
+    const po = await peerOpts();
     net.close(); net.on = true; net.host = false; net.code = code; net.game = 0;
-    const peer = new window.Peer(); net.peer = peer;
+    const peer = new window.Peer(undefined, po); net.peer = peer;
     let timer = setTimeout(() => { if (!net.conn) { onlineMsg('找不到這個房間，請確認代碼或請對方重新建立', true); net.close(); } }, 12000);
     peer.on('open', () => {
       const conn = peer.connect(ROOM_PREFIX + code, { reliable: true });
@@ -1090,7 +1103,7 @@
     if (!net.on) return;
     box.innerHTML = `房間 <b>${net.code}</b>．版本 ${BUILD}．你是${net.host ? '房主' : '挑戰者'}<br>你：${net.myCfg ? '<b class="ok">已準備</b>' : '選擇中'}　對手：${net.peerCfg ? '<b class="ok">已準備</b>' : '選擇中'}`;
   }
-  $('#btnOnline').onclick = () => { net.close(); $('#roomBox').hidden = true; onlineMsg(''); show('online'); };
+  $('#btnOnline').onclick = () => { if (typeof Cloud !== 'undefined') Cloud.ice(); net.close(); $('#roomBox').hidden = true; onlineMsg(''); show('online'); };
   $('#btnCreate').onclick = createRoom;
   $('#btnJoin').onclick = joinRoom;
   $('#joinCode').onkeydown = e => { if (e.key === 'Enter') joinRoom(); };
@@ -1137,8 +1150,9 @@
     async ensure() {
       if (this.peer || this.failed) return;
       try { await loadPeer(); } catch { this.failed = true; this.ui(); return; }
+      const po = await peerOpts();
       const mk = () => {
-        const code = newCode(); const peer = new window.Peer(WATCH_PREFIX + code); this.peer = peer;
+        const code = newCode(); const peer = new window.Peer(WATCH_PREFIX + code, po); this.peer = peer;
         peer.on('open', () => { this.code = code; this.ready = true; this.ui(); if (net.on && net.host) net.send({ k: 'watchcode', code }); });
         peer.on('connection', conn => this.accept(conn));
         peer.on('error', e => {
@@ -1199,8 +1213,9 @@
       if (!/^\d{4}[A-Z]$/.test(code)) { this.msg('請輸入 4 個數字＋1 個英文字母的觀戰房號，例如 3842K', true); return; }
       this.msg('連線中…');
       try { await loadPeer(); } catch { this.msg('連線元件載入失敗，請確認網路後再試', true); return; }
+      const po = await peerOpts();
       this.close(); this.code = code;
-      const peer = new window.Peer(); this.peer = peer;
+      const peer = new window.Peer(undefined, po); this.peer = peer;
       const timer = setTimeout(() => { if (!this.conn) { this.msg('找不到這個觀戰房號，請確認對局還在進行', true); this.close(); } }, 12000);
       peer.on('open', () => {
         this.okBuild = false;
