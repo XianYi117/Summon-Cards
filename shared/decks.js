@@ -17,7 +17,16 @@ function deckProblems(cards) {
   if (new Set(cards).size !== cards.length) out.push('有重複編號');
   return out;
 }
-function loadMyDecks() { try { return JSON.parse(localStorage.getItem(DECK_STORE) || '[]').filter(d => d && Array.isArray(d.cards)); } catch { return []; } }
+const DEFAULT_DECK_NAME = '個人牌組';
+// 牌組編號：預組 1～11，個人牌組接在後面，刪除後編號不重用
+function nextDeckNo(list) { return Math.max(0, ...PRESETS.map(p => p.no), ...(list || loadMyDecks()).map(d => d.no || 0)) + 1; }
+function deckTitle(d) { return d.no ? `${d.no}.${d.name || DEFAULT_DECK_NAME}` : (d.name || DEFAULT_DECK_NAME); }
+function loadMyDecks() {
+  let list; try { list = JSON.parse(localStorage.getItem(DECK_STORE) || '[]').filter(d => d && Array.isArray(d.cards)); } catch { return []; }
+  // 舊牌組沒有編號：依序補上
+  if (list.some(d => !d.no)) { for (const d of list) if (!d.no) d.no = nextDeckNo(list); saveMyDecks(list); }
+  return list;
+}
 function saveMyDecks(list) { try { localStorage.setItem(DECK_STORE, JSON.stringify(list)); return true; } catch { return false; } }
 // 把合法的自訂牌組加進遊戲的牌組選單（fixed＝固定 20 張，不再隨機）
 (function addCustomDecks() {
@@ -25,7 +34,7 @@ function saveMyDecks(list) { try { localStorage.setItem(DECK_STORE, JSON.stringi
     const cards = d.cards.filter(id => CARDS[id]);
     if (deckProblems(cards).length) return;
     const comp = { F: 0, W: 0, G: 0 }; cards.forEach(id => comp[id[0]]++);
-    DECKS[key] = { label: d.name || '自訂牌組', comp, fixed: cards, leader: LEADERS[d.leader] ? d.leader : '', custom: true };
+    DECKS[key] = { label: d.no ? deckTitle(d) : (d.name || '分享牌組'), comp, fixed: cards, leader: LEADERS[d.leader] ? d.leader : '', custom: true, tier: d.no ? '個人' : '其他', no: d.no };
   };
   loadMyDecks().forEach((d, i) => add('MY' + i, d));
   const h = new URLSearchParams(location.hash.slice(1));

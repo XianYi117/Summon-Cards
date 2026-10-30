@@ -92,20 +92,26 @@
       }
     }
     inf.appendChild(el('div', 'lab', '牌組'));
-    const dk = el('div', 'chips');
-    for (const key of Object.keys(DECKS)) {
-      const d = DECKS[key];
-      const sub = d.fixed ? `<small>${d.custom ? '自訂．' : ''}${Object.entries(d.comp).filter(([, v]) => v).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}${d.leader ? `．${LEADERS[d.leader].name}` : ''}</small>` : d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : '<small>27 張隨機 20 張．每屬性最多 8</small>';
-      const b = el('button', 'chip', `<span>${d.label}</span>${sub}`); b.setAttribute('aria-pressed', s.deck === key);
-      b.onclick = () => {
-        s.deck = key;
-        if (d.leader && !(net.on && net.myCfg)) { s.leader = d.leader; if (d.leader !== 'L11') delete s.main; }
-        if (s.leader === 'L11' && !s.mainTouched && d.comp) s.main = Object.entries(d.comp).sort((a, b) => b[1] - a[1])[0][0];
-        renderPick();
-      };
-      dk.appendChild(b);
+    for (const [tier, title] of [['初階', '初階預組'], ['進階', '進階預組'], ['個人', '個人構築'], ['其他', '其他']]) {
+      const keys = Object.keys(DECKS).filter(k => (DECKS[k].tier || '其他') === tier);
+      if (!keys.length) continue;
+      inf.appendChild(el('div', 'dtier', title));
+      const dk = el('div', 'chips decks');
+      for (const key of keys) {
+        const d = DECKS[key];
+        const sub = d.fixed ? `<small>${d.custom ? '自訂．' : ''}${Object.entries(d.comp).filter(([, v]) => v).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}${d.leader ? `．${LEADERS[d.leader].name}` : ''}</small>` : d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : '<small>27 張隨機 20 張．每屬性最多 8</small>';
+        const b = el('button', 'chip', `<span>${d.label}</span>${sub}`); b.setAttribute('aria-pressed', s.deck === key);
+        b.onclick = () => {
+          s.deck = key;
+          if (d.leader && !(net.on && net.myCfg)) { s.leader = d.leader; if (d.leader !== 'L11') delete s.main; }
+          if (s.leader === 'L11' && !s.mainTouched && d.comp) s.main = Object.entries(d.comp).sort((a, b) => b[1] - a[1])[0][0];
+          renderPick();
+        };
+        dk.appendChild(b);
+      }
+      inf.appendChild(dk);
     }
-    inf.appendChild(dk);
+    if (DECKS[s.deck] && DECKS[s.deck].desc) inf.appendChild(el('div', 'desc', DECKS[s.deck].desc));
     const bl = el('button', 'btn ghost small', '＋ 卡牌構築（自訂牌組）'); bl.onclick = () => { location.href = SHARED_BASE + '../builder/'; }; bl.style.justifySelf = 'start'; inf.appendChild(bl);
     const ok = s.leader && s.deck && (s.leader !== 'L11' || s.main);
     const act = el('div', 'pick-actions');
