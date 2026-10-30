@@ -881,6 +881,10 @@
   };
 
   // ================= 連線對戰 =================
+  const GAME_KINDS = ['play', 'sac', 'counter', 'pick', 'reqsac', 'presac'];
+  const RECONNECT_SEC = 60;
+  // 手機切回這個頁面時，如果連線已斷，馬上開始重連
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && net.on && net.inGame() && (!net.conn || !net.conn.open)) net.dropped(); });
   const PEER_SRC = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
   const ROOM_PREFIX = 'summon-cards-beta-';  // 測試版與正式版房號分開，彼此連不到
   // 連線版本：規則引擎＋卡牌資料＋連線協定的指紋。雙方不同就不能開局（避免一邊新版一邊舊版，結果對不上）
@@ -897,14 +901,20 @@
   }
   const net = {
     on: false, host: false, peer: null, conn: null, code: '', myCfg: null, peerCfg: null, game: 0, queues: {}, waiters: {}, sacQ: [], sacBusy: false, idleW: [],
-    send(m) { if (this.conn && this.conn.open) this.conn.send({ ...m, g: this.game }); },
+    send(m) {
+      m = { ...m, g: this.game };
+      if (GAME_KINDS.includes(m.k)) { m.s = ++this.outSeq; this.out.push(m); }
+      if (this.conn && this.conn.open) try { this.conn.send(m); } catch { }
+    },
+    // 斷線重連用：對局中送出的動作都編號留存（out），收到的動作記到 inSeq；重連後補送對方沒收到的
+    out: [], outSeq: 0, inSeq: 0, pend: {}, reconn: null,
     close(silent) {
       const c = this.conn; this.conn = null;
       try { c && c.close(); } catch { } try { this.peer && this.peer.destroy(); } catch { }
       this.peer = null; this.on = false; this.resetGame();
     },
     // 對戰中的訊息佇列
-    resetGame() { this.queues = {}; this.waiters = {}; this.sacQ = []; this.sacBusy = false; this.idleW = []; },
+    resetGame() { this.queues = {}; this.waiters = {}; this.sacQ = []; this.sacBusy = false; this.idleW = []; this.out = []; this.outSeq = 0; this.inSeq = 0; this.pend = {}; this.stopReconn(); },
     // 依種類排隊的訊息（出牌、獻祭、反擊、選擇…）
     next(kind) {
       return new Promise(res => {
@@ -942,8 +952,23 @@
         case 'start': if (m.build !== BUILD) { this.mismatch(); return; } this.beginGame(m); return;
         case 'bye': this.lost('對手已離開房間'); return;
         case 'watchcode': rec.remoteCode = m.code; rec.ui(); return;
+        case 'rejoin': // 對手斷線後回來（房主收到）
+          if (m.build !== BUILD || m.game !== this.game || m.code !== this.code) { this.send({ k: 'full' }); return; }
+          this.send({ k: 'resume', got: this.inSeq }); this.resend(m.got); this.resumed(); return;
+        case 'resume': this.resend(m.got); this.resumed(); return;
       }
       if (m.g !== this.game) return;
+      // 依編號依序處理：重複的丟掉，跳號的先暫存
+      if (m.s) {
+        if (m.s <= this.inSeq) return;
+        if (m.s > this.inSeq + 1) { this.pend[m.s] = m; return; }
+        this.inSeq = m.s; this.handle(m);
+        while (this.pend[this.inSeq + 1]) { const n = this.pend[this.inSeq + 1]; delete this.pend[this.inSeq + 1]; this.inSeq = n.s; this.handle(n); }
+        return;
+      }
+      this.handle(m);
+    },
+    handle(m) {
       if (m.k === 'reqsac') { if (this.host) this.orderSac(1 - ME, m.uid); return; }
       if (m.k === 'presac') { if (!this.host) this.enqueueSac(m.who, m.uid); return; }
       const w = this.waiters[m.k];
@@ -951,7 +976,36 @@
       else (this.queues[m.k] || (this.queues[m.k] = [])).push(m);
     },
     mismatch(remote) { if (!remote) this.send({ k: 'mismatch' }); const c = this.conn; this.conn = null; this.on = false; setTimeout(() => { try { c && c.close(); } catch { } this.close(); }, 300); versionMismatch('對手'); },
+    resend(got) { for (const x of this.out) if (x.s > got && this.conn && this.conn.open) try { this.conn.send(x); } catch { } },
+    inGame() { return !!(G && G.winner === null && this.game > 0 && !spectating); },
+    // 對局中斷線：不結束對局，60 秒內自動重連
+    dropped() {
+      if (!this.inGame()) { this.lost(); return; }
+      if (this.reconn) return;
+      const until = Date.now() + RECONNECT_SEC * 1000;
+      const box = $('#reconn'); box.hidden = false;
+      const tick = () => {
+        const left = Math.ceil((until - Date.now()) / 1000);
+        if (left <= 0) { this.stopReconn(); this.lost('對手超過 ' + RECONNECT_SEC + ' 秒沒有回來，對局結束。'); return; }
+        box.innerHTML = `<b>連線中斷</b>正在重新連線…（${left} 秒）<small>${this.host ? '等待對手回來' : '正在重新連到房主'}</small>`;
+        if (this.peer && !this.peer.destroyed && this.peer.disconnected) try { this.peer.reconnect(); } catch { }
+        if (!this.host && (!this.conn || !this.conn.open) && Date.now() - (this.lastTry || 0) > 2900) this.tryRejoin();
+        else if (!this.host && this.conn && this.conn.open) this.sendRejoin();
+      };
+      this.reconn = setInterval(tick, 1000); tick();
+    },
+    tryRejoin() {
+      this.lastTry = Date.now();
+      if (!this.peer || this.peer.destroyed || this.peer.disconnected) return;
+      const conn = this.peer.connect(ROOM_PREFIX + this.code, { reliable: true });
+      this.bind(conn);
+      conn.on('open', () => { if (!this.reconn) { try { conn.close(); } catch { } return; } this.sendRejoin(); });
+    },
+    sendRejoin() { try { this.conn.send({ k: 'rejoin', build: BUILD, game: this.game, code: this.code, got: this.inSeq, g: this.game }); } catch { } },
+    resumed() { if (!this.reconn) return; this.stopReconn(); banner('已重新連線，繼續對戰', 900); },
+    stopReconn() { if (this.reconn) { clearInterval(this.reconn); this.reconn = null; } const b = $('#reconn'); if (b) b.hidden = true; },
     lost(text) {
+      this.stopReconn();
       const was = this.conn; this.conn = null;
       if (!this.on) return;
       if (G && G.winner === null) { G = null; resolver = null; clearInterval(clockT); }
@@ -963,8 +1017,8 @@
     bind(conn) {
       this.conn = conn;
       conn.on('data', d => this.onData(d));
-      conn.on('close', () => { if (this.conn === conn) this.lost(); });
-      conn.on('error', () => { if (this.conn === conn) this.lost(); });
+      conn.on('close', () => { if (this.conn === conn) this.dropped(); });
+      conn.on('error', () => { if (this.conn === conn) this.dropped(); });
     },
     toPick() { this.myCfg = null; cfg = { me: {}, foe: {} }; pickStep = 'me'; renderPick(); show('pick'); renderNetPick(); },
     ready() {
@@ -1008,10 +1062,12 @@
     const peer = new window.Peer(ROOM_PREFIX + code); net.peer = peer;
     peer.on('open', () => { $('#roomCode').textContent = code; $('#roomBox').hidden = false; onlineMsg('把房間代碼告訴朋友，等待對手加入…'); });
     peer.on('connection', conn => {
+      if (net.reconn && (!net.conn || !net.conn.open)) { net.bind(conn); return; } // 立刻開始聽，等對方送 rejoin
       if (net.conn) { conn.on('open', () => { conn.send({ k: 'full' }); setTimeout(() => conn.close(), 300); }); return; }
       conn.on('open', () => { net.bind(conn); conn.send({ k: 'hello', build: BUILD }); if (rec.ready) conn.send({ k: 'watchcode', code: rec.code }); net.toPick(); });
     });
-    peer.on('error', e => { if (e.type === 'unavailable-id') { net.close(); createRoom(); } else if (!net.conn) onlineMsg('建立房間失敗：' + (e.type || '網路錯誤'), true); });
+    peer.on('disconnected', () => { if (net.inGame()) try { peer.reconnect(); } catch { } });
+    peer.on('error', e => { if (net.reconn) return; if (e.type === 'unavailable-id') { net.close(); createRoom(); } else if (!net.conn) onlineMsg('建立房間失敗：' + (e.type || '網路錯誤'), true); });
   }
   async function joinRoom() {
     const code = $('#joinCode').value.trim().toUpperCase();
@@ -1026,7 +1082,8 @@
       conn.on('open', () => { clearTimeout(timer); net.bind(conn); conn.send({ k: 'hello', build: BUILD }); net.toPick(); });
       conn.on('data', d => { if (d && d.k === 'full') { onlineMsg('這個房間已經滿了', true); net.close(); show('online'); } });
     });
-    peer.on('error', e => { clearTimeout(timer); if (!net.conn) { onlineMsg(e.type === 'peer-unavailable' ? '找不到這個房間，請確認代碼' : '連線失敗：' + (e.type || '網路錯誤'), true); net.close(); } });
+    peer.on('disconnected', () => { if (net.inGame()) try { peer.reconnect(); } catch { } });
+    peer.on('error', e => { clearTimeout(timer); if (net.reconn) return; if (!net.conn) { onlineMsg(e.type === 'peer-unavailable' ? '找不到這個房間，請確認代碼' : '連線失敗：' + (e.type || '網路錯誤'), true); net.close(); } });
   }
   function renderNetPick() {
     const box = $('#netPick'); if (!box) return;

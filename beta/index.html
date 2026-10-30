@@ -363,6 +363,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .rules .rnote{color:var(--muted);font-size:13px}.rules .rk{white-space:nowrap;color:var(--gold-hi);font-weight:700}.rules .rk small{color:var(--muted);font-weight:400}
 .rules .F{color:#ff7a62;font-weight:700}.rules .W{color:#6fb2ff;font-weight:700}.rules .G{color:#7fdc87;font-weight:700}
 .rules details{margin-top:12px}.rules details[open] summary{border-bottom:1px solid var(--line);margin-bottom:6px}
+.reconn{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:120;background:#141920f2;border:1px solid var(--gold);border-radius:8px;padding:16px 26px;text-align:center;display:grid;gap:4px;font-size:16px;box-shadow:0 10px 40px #000a}.reconn b{color:var(--gold-hi);font-size:20px}.reconn small{color:var(--muted);font-size:13px}
 </style>
 
 <div id="app">
@@ -441,6 +442,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
         <div class="phase" id="phase">準備</div>
         <div class="clock" id="clock">⏱ 00:00</div>
         <div class="netstate" id="netState" hidden>等待對手…</div>
+        <div class="reconn" id="reconn" hidden></div>
         <div class="watchinfo" id="watchInfo"></div>
         <div class="tools">
           <button class="btn ghost small" id="btnRuleQ">規則</button>
