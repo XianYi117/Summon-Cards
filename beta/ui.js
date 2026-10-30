@@ -882,7 +882,19 @@
 
   // ================= 連線對戰 =================
   const PEER_SRC = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
-  const ROOM_PREFIX = 'summon-cards-vj1030-';
+  const ROOM_PREFIX = 'summon-cards-beta-';  // 測試版與正式版房號分開，彼此連不到
+  // 連線版本：規則引擎＋卡牌資料＋連線協定的指紋。雙方不同就不能開局（避免一邊新版一邊舊版，結果對不上）
+  const NET_PROTO = 2;
+  const BUILD = (() => {
+    const src = String(Game) + JSON.stringify(CARDS) + JSON.stringify(LEADERS) + NET_PROTO;
+    let h = 2166136261; for (let i = 0; i < src.length; i++) h = Math.imul(h ^ src.charCodeAt(i), 16777619);
+    return (h >>> 0).toString(36);
+  })();
+  function versionMismatch(where) {
+    const text = `雙方的遊戲版本不同：${where}的版本跟你不一樣，繼續玩會出現結果對不上的情況。請${where === '對手' ? '兩個人都' : ''}重新整理網頁（電腦按 Ctrl+F5，手機下拉重新整理）後再連線。`;
+    if (where === '對局端') { show('watchScr'); watch.msg(text, true); return; }
+    $('#roomBox').hidden = true; show('online'); onlineMsg(text, true);
+  }
   const net = {
     on: false, host: false, peer: null, conn: null, code: '', myCfg: null, peerCfg: null, game: 0, queues: {}, waiters: {}, sacQ: [], sacBusy: false, idleW: [],
     send(m) { if (this.conn && this.conn.open) this.conn.send({ ...m, g: this.game }); },
@@ -924,9 +936,10 @@
     onData(m) {
       if (!m || typeof m !== 'object') return;
       switch (m.k) {
-        case 'hello': return;
-        case 'cfg': this.peerCfg = m.cfg; renderNetPick(); if (this.host) this.tryStart(); return;
-        case 'start': this.beginGame(m); return;
+        case 'hello': if ((m.build || 'old') !== BUILD) this.mismatch(); return;
+        case 'mismatch': this.mismatch(true); return;
+        case 'cfg': if (m.build !== BUILD) { this.mismatch(); return; } this.peerCfg = m.cfg; renderNetPick(); if (this.host) this.tryStart(); return;
+        case 'start': if (m.build !== BUILD) { this.mismatch(); return; } this.beginGame(m); return;
         case 'bye': this.lost('對手已離開房間'); return;
         case 'watchcode': rec.remoteCode = m.code; rec.ui(); return;
       }
@@ -937,6 +950,7 @@
       if (w && w.length) { w.shift()(m); this.netWait(); }
       else (this.queues[m.k] || (this.queues[m.k] = [])).push(m);
     },
+    mismatch(remote) { if (!remote) this.send({ k: 'mismatch' }); const c = this.conn; this.conn = null; this.on = false; setTimeout(() => { try { c && c.close(); } catch { } this.close(); }, 300); versionMismatch('對手'); },
     lost(text) {
       const was = this.conn; this.conn = null;
       if (!this.on) return;
@@ -956,12 +970,12 @@
     ready() {
       const s = cfg.me; resolveSide(s);
       this.myCfg = { leader: s.realLeader, deck: s.cards, deckType: s.deck, deckLabel: (DECKS[s.deck] || {}).label, main: s.realLeader === 'L11' ? s.main : undefined, randLeader: s.leader === 'RANDOM' };
-      this.send({ k: 'cfg', cfg: this.myCfg }); renderNetPick();
+      this.send({ k: 'cfg', cfg: this.myCfg, build: BUILD }); renderNetPick();
       if (this.host) this.tryStart();
     },
     tryStart() {
       if (!this.myCfg || !this.peerCfg) return;
-      const m = { k: 'start', seed: (Math.random() * 2 ** 31) | 0, cfgs: [this.myCfg, this.peerCfg], game: this.game + 1 };
+      const m = { k: 'start', seed: (Math.random() * 2 ** 31) | 0, cfgs: [this.myCfg, this.peerCfg], game: this.game + 1, build: BUILD };
       this.send(m); this.beginGame(m);
     },
     beginGame(m) {
@@ -995,7 +1009,7 @@
     peer.on('open', () => { $('#roomCode').textContent = code; $('#roomBox').hidden = false; onlineMsg('把房間代碼告訴朋友，等待對手加入…'); });
     peer.on('connection', conn => {
       if (net.conn) { conn.on('open', () => { conn.send({ k: 'full' }); setTimeout(() => conn.close(), 300); }); return; }
-      conn.on('open', () => { net.bind(conn); conn.send({ k: 'hello' }); if (rec.ready) conn.send({ k: 'watchcode', code: rec.code }); net.toPick(); });
+      conn.on('open', () => { net.bind(conn); conn.send({ k: 'hello', build: BUILD }); if (rec.ready) conn.send({ k: 'watchcode', code: rec.code }); net.toPick(); });
     });
     peer.on('error', e => { if (e.type === 'unavailable-id') { net.close(); createRoom(); } else if (!net.conn) onlineMsg('建立房間失敗：' + (e.type || '網路錯誤'), true); });
   }
@@ -1009,7 +1023,7 @@
     let timer = setTimeout(() => { if (!net.conn) { onlineMsg('找不到這個房間，請確認代碼或請對方重新建立', true); net.close(); } }, 12000);
     peer.on('open', () => {
       const conn = peer.connect(ROOM_PREFIX + code, { reliable: true });
-      conn.on('open', () => { clearTimeout(timer); net.bind(conn); net.toPick(); });
+      conn.on('open', () => { clearTimeout(timer); net.bind(conn); conn.send({ k: 'hello', build: BUILD }); net.toPick(); });
       conn.on('data', d => { if (d && d.k === 'full') { onlineMsg('這個房間已經滿了', true); net.close(); show('online'); } });
     });
     peer.on('error', e => { clearTimeout(timer); if (!net.conn) { onlineMsg(e.type === 'peer-unavailable' ? '找不到這個房間，請確認代碼' : '連線失敗：' + (e.type || '網路錯誤'), true); net.close(); } });
@@ -1017,7 +1031,7 @@
   function renderNetPick() {
     const box = $('#netPick'); if (!box) return;
     if (!net.on) return;
-    box.innerHTML = `房間 <b>${net.code}</b>．你是${net.host ? '房主' : '挑戰者'}<br>你：${net.myCfg ? '<b class="ok">已準備</b>' : '選擇中'}　對手：${net.peerCfg ? '<b class="ok">已準備</b>' : '選擇中'}`;
+    box.innerHTML = `房間 <b>${net.code}</b>．版本 ${BUILD}．你是${net.host ? '房主' : '挑戰者'}<br>你：${net.myCfg ? '<b class="ok">已準備</b>' : '選擇中'}　對手：${net.peerCfg ? '<b class="ok">已準備</b>' : '選擇中'}`;
   }
   $('#btnOnline').onclick = () => { net.close(); $('#roomBox').hidden = true; onlineMsg(''); show('online'); };
   $('#btnCreate').onclick = createRoom;
@@ -1081,6 +1095,7 @@
       conn.on('open', () => {
         if (this.conns.length >= WATCH_MAX) { conn.send({ k: 'full' }); setTimeout(() => { try { conn.close(); } catch { } }, 400); return; }
         this.conns.push(conn); this.ui();
+        conn.send({ k: 'build', build: BUILD });
         conn.send(this.start ? { k: 'sync', start: this.start, log: this.log, elapsed: Date.now() - this.t0 } : { k: 'idle' });
       });
       const drop = () => { if (this.conns.includes(conn)) { this.conns = this.conns.filter(c => c !== conn); this.ui(); } };
@@ -1131,6 +1146,7 @@
       const peer = new window.Peer(); this.peer = peer;
       const timer = setTimeout(() => { if (!this.conn) { this.msg('找不到這個觀戰房號，請確認對局還在進行', true); this.close(); } }, 12000);
       peer.on('open', () => {
+        this.okBuild = false;
         const conn = peer.connect(WATCH_PREFIX + code, { reliable: true });
         conn.on('open', () => { clearTimeout(timer); if (this.peer !== peer) return; this.conn = conn; if (!spectating) this.msg('已連上，等待對局資料…'); });
         conn.on('data', d => this.onData(d));
@@ -1149,9 +1165,10 @@
     onData(m) {
       if (!m || typeof m !== 'object') return;
       switch (m.k) {
+        case 'build': if (m.build !== BUILD) { this.close(); versionMismatch('對局端'); } else this.okBuild = true; return;
         case 'full': this.msg('這個房間的觀戰人數已滿（最多 5 人）', true); this.close(); return;
         case 'idle': if (!G || !spectating) this.msg('已連上。目前沒有進行中的對局，下一場開始時會自動進入觀戰。'); return;
-        case 'sync': this.begin(m.start, m.log || [], m.elapsed || 0); return;
+        case 'sync': if (!this.okBuild) { this.close(); versionMismatch('對局端'); return; } this.begin(m.start, m.log || [], m.elapsed || 0); return;
         case 'start': this.begin(m.start, [], 0); return;
         case 'ev': if (spectating && G) this.add(m.m); return;
       }
