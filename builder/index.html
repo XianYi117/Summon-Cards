@@ -74,25 +74,36 @@ input[type=search],select,input[type=text],input[type=number]{background:var(--s
 
 /* 側欄 */
 aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;position:sticky;top:56px;height:calc(100vh - 56px);overflow:auto;display:flex;flex-direction:column;gap:12px}
-aside h2{margin:0;font:700 16px var(--f-display);letter-spacing:.08em;color:var(--gold-hi)}
-aside label{display:grid;gap:3px;font-size:12.5px;color:var(--muted)}
-aside label input,aside label select{color:var(--text);font-size:14px}
-.counts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
-.counts div{background:var(--stone);border-radius:6px;padding:6px 2px;font-size:12px;color:var(--muted);border-bottom:3px solid var(--line)}
-.counts div b{display:block;font-size:20px;color:var(--text)}
-.counts .F{border-color:var(--F)}.counts .W{border-color:var(--W)}.counts .G{border-color:var(--G)}
-.counts .over b{color:var(--bad)}
-.status{font-size:13px;padding:7px 10px;border-radius:6px;background:#2b1b1b;color:#f2b4a9}
-.status.ok{background:#1b2b20;color:#9fe0b4}
-.sel{display:grid;gap:2px;font-size:13px;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:6px}
-.sel div{display:flex;gap:6px;align-items:center}
-.sel div span.dot{flex:none}
-.sel div span:not(.dot){flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sel button{border:none;background:none;color:var(--muted);padding:0 4px}
-.sel button:hover{color:var(--bad)}
+.tally{display:flex;gap:6px;align-items:stretch}
+.tally span{flex:1;background:var(--stone);border-radius:6px;padding:5px 4px;text-align:center;font-size:12px;color:var(--muted);border-bottom:3px solid var(--line);line-height:1.2}
+.tally b{display:block;font-size:19px;color:var(--text)}
+.tally .F{border-color:var(--F)}.tally .W{border-color:var(--W)}.tally .G{border-color:var(--G)}
+.tally .over b{color:var(--bad)}.tally .done b{color:var(--ok)}
+.deckline{font-size:12.5px;color:var(--muted);min-height:18px}
+.deckline .bad{color:#f2b4a9}
+.detail{flex:1;display:grid;align-content:start;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.detail img{width:min(100%,230px);justify-self:center;border-radius:10px;aspect-ratio:750/1050;object-fit:cover}
+.detail h3{margin:0;font:700 19px var(--f-display);letter-spacing:.04em}
+.detail .meta{font-size:13px;color:var(--muted)}
+.detail .fx{display:grid;gap:3px;background:var(--stone);border-radius:8px;padding:9px 11px;font-size:15.5px;line-height:1.55}
+.detail .fx i{font-style:normal;font-size:12px;color:var(--gold-hi);letter-spacing:.1em}
+.detail .fx.sac i{color:#c9c3b5}
+.detail .tip{color:var(--muted);font-size:13px;text-align:center;padding:30px 6px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.actions .btn{padding:10px;font-size:15px;text-align:center}
+.minor{display:flex;justify-content:center;gap:4px;font-size:13px;color:var(--muted)}
+.minor button{border:none;background:none;color:var(--muted);padding:2px 6px;text-decoration:underline;text-underline-offset:3px}
+.minor button:hover{color:var(--gold-hi)}
 .btns{display:flex;flex-wrap:wrap;gap:6px}
 .btns .btn{flex:1 1 auto;text-align:center}
 .hint{font-size:12px;color:var(--muted);margin:0}
+.dlg label{display:grid;gap:3px;font-size:12.5px;color:var(--muted)}
+.dlg h3{margin:0}
+.decklist{display:grid;gap:6px;max-height:50vh;overflow:auto}
+.decklist div{display:flex;align-items:center;gap:8px;background:#0d1016;border:1px solid var(--line);border-radius:6px;padding:7px 10px}
+.decklist div.cur{border-color:var(--gold)}
+.decklist span{flex:1;min-width:0}
+.decklist small{color:var(--muted);display:block}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2a2518;border:1px solid var(--gold);padding:8px 18px;border-radius:6px;z-index:99;transition:opacity .3s}
 
 /* 放大 / 對話框 */
@@ -156,36 +167,19 @@ aside label input,aside label select{color:var(--text);font-size:14px}
     <div class="grid" id="grid"></div>
   </div>
   <aside>
-    <h2>我的牌組</h2>
-    <label>載入已存牌組
-      <select id="myDecks"></select>
-    </label>
-    <label>牌組名稱<input type="text" id="deckName" placeholder="例：火草速攻" maxlength="20"></label>
-    <label>隊長<select id="leader"></select></label>
-    <div class="counts">
-      <div class="F"><b id="cF">0</b>火／8</div>
-      <div class="W"><b id="cW">0</b>水／8</div>
-      <div class="G"><b id="cG">0</b>草／8</div>
-      <div><b id="cT">0</b>合計／20</div>
+    <div class="tally">
+      <span class="F" id="tF"><b id="cF">0</b>火</span>
+      <span class="W" id="tW"><b id="cW">0</b>水</span>
+      <span class="G" id="tG"><b id="cG">0</b>草</span>
+      <span id="tT"><b id="cT">0</b>合計／20</span>
     </div>
-    <div class="status" id="status"></div>
-    <div class="sel" id="selList"></div>
-    <div class="btns">
-      <button class="btn primary" id="save">儲存</button>
-      <button class="btn" id="saveAs">另存新牌組</button>
-      <button class="btn" id="del">刪除</button>
-      <button class="btn" id="clear">清空</button>
+    <div class="deckline" id="deckLine"></div>
+    <div class="detail" id="detail"></div>
+    <div class="actions">
+      <button class="btn primary" id="saveBtn">儲存</button>
+      <button class="btn" id="outBtn">輸出</button>
     </div>
-    <div class="btns">
-      <button class="btn primary" id="play">用這副牌開打</button>
-      <button class="btn" id="share">分享連結／代碼</button>
-      <button class="btn" id="import">匯入代碼</button>
-    </div>
-    <div class="btns">
-      <button class="btn" id="toPrint">A4 列印／PDF</button>
-      <button class="btn" id="exportJson">匯出 JSON</button>
-    </div>
-    <p class="hint">儲存的牌組會出現在遊戲「選擇牌組」裡（同一個瀏覽器）。要給別人用，按「分享連結」。只要列印不打牌的話，張數不用符合 20 張規則。</p>
+    <div class="minor"><button id="loadBtn">我的牌組／匯入</button><button id="clear">清空</button></div>
   </aside>
 </section>
 
@@ -274,7 +268,8 @@ aside label input,aside label select{color:var(--text);font-size:14px}
           : `<span><i>啟動</i>${esc(d.act)}</span><span><i style="background:#555">獻祭</i>${esc(d.sac)}</span><span class="role">定位：${esc(d.role)}</span>`}</div></div>
         <button class="zoom" title="放大">🔍</button>`;
       c.tabIndex = 0;
-      c.onclick = e => { if (e.target.closest('.zoom')) { zoom(id); return; } toggle(id); };
+      c.onclick = e => { if (e.target.closest('.zoom')) { zoom(id); return; } toggle(id); showDetail(id); };
+      c.onpointerenter = () => showDetail(id); c.onfocus = () => showDetail(id);
       c.onkeydown = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(id); } };
       frag.appendChild(c);
     }
@@ -291,93 +286,118 @@ aside label input,aside label select{color:var(--text);font-size:14px}
 
   // ---------- 側欄 ----------
   const sorted = () => [...st.sel].sort();
+  let detailId = '';
+  function showDetail(id) {
+    const box = $('#detail');
+    if (!id) { box.innerHTML = '<div class="tip">滑鼠移到卡片上，這裡會顯示卡牌效果。<br>點一下卡片＝勾選／取消。</div>'; detailId = ''; return; }
+    if (id === detailId && box.firstChild) { box.querySelector('h3').dataset.on = isLeader(id) ? st.leader === id : st.sel.has(id); return; }
+    detailId = id;
+    const d = info(id), L = isLeader(id), col = L ? d.color : id[0];
+    box.innerHTML = `<img src="${img(id, true)}" alt="${id}">
+      <h3><span class="dot ${col}"></span> ${id}．${esc(d.name)}</h3>
+      <div class="meta">${COLOR_NAME[col]}屬性．${esc(d.race)}${L ? '．隊長' : `．${esc(d.role)}`}</div>
+      ${L ? `<div class="fx"><i>${esc(d.skill)}</i>${esc(d.text)}</div>`
+          : `<div class="fx"><i>啟動</i>${esc(d.act)}</div><div class="fx sac"><i>獻祭</i>${esc(d.sac)}</div>`}`;
+  }
   function renderSide() {
     const cards = sorted(), cnt = { F: 0, W: 0, G: 0 };
     cards.forEach(id => cnt[id[0]]++);
-    for (const k of ['F', 'W', 'G']) { $('#c' + k).textContent = cnt[k]; $('#c' + k).parentNode.classList.toggle('over', cnt[k] > ATTR_MAX); }
-    $('#cT').textContent = cards.length; $('#cT').parentNode.classList.toggle('over', cards.length > 20);
-    const probs = deckProblems(cards);
-    const s = $('#status');
-    s.className = 'status' + (probs.length ? '' : ' ok');
-    s.textContent = probs.length ? '還不能對戰：' + probs.join('；') : `✓ 可以對戰${st.leader ? '' : '（尚未選隊長，可開打時再選）'}`;
-    $('#play').disabled = probs.length > 0;
-    const ls = $('#leader'); ls.value = st.leader;
-    const box = $('#selList'); box.innerHTML = '';
-    const rows = [...(st.leader ? [st.leader] : []), ...cards];
-    if (!rows.length) box.appendChild(el('div', '', '<span style="color:var(--muted)">點卡片勾選加入</span>'));
-    for (const id of rows) {
-      const d = info(id), L = isLeader(id);
-      const r = el('div', '', `<span class="dot ${L ? d.color : id[0]}"></span><span><b>${id}</b> ${esc(d.name)}${L ? '（隊長）' : ''}</span>`);
-      const x = el('button', '', '✕'); x.title = '移除'; x.onclick = () => toggle(id); r.appendChild(x); box.appendChild(r);
-    }
-    renderMyDecks();
-  }
-  function renderMyDecks() {
-    const list = loadMyDecks(), s = $('#myDecks');
-    s.innerHTML = `<option value="-1">— 新牌組 —</option>` + list.map((d, i) => `<option value="${i}">${esc(d.name || '未命名')}（${d.cards.length} 張）</option>`).join('');
-    s.value = st.deckIdx;
-    $('#del').disabled = st.deckIdx < 0;
+    for (const k of ['F', 'W', 'G']) { $('#c' + k).textContent = cnt[k]; $('#t' + k).classList.toggle('over', cnt[k] > ATTR_MAX); }
+    $('#cT').textContent = cards.length;
+    $('#tT').classList.toggle('over', cards.length > 20); $('#tT').classList.toggle('done', cards.length === 20 && !deckProblems(cards).length);
+    const probs = deckProblems(cards).filter(x => !/需要 20 張/.test(x) || cards.length > 20);
+    const name = st.deckIdx >= 0 ? (loadMyDecks()[st.deckIdx] || {}).name : '';
+    $('#deckLine').innerHTML = [name ? `編輯中：${esc(name)}` : '', st.leader ? `隊長：${esc(LEADERS[st.leader].name)}` : '', probs.length ? `<span class="bad">${esc(probs.join('；'))}</span>` : ''].filter(Boolean).join('．');
   }
   function refresh() { renderGrid(); renderSide(); if (!$('#print').hidden) renderPrint(); persistDraft(); }
   function persistDraft() { try { sessionStorage.setItem('summon_builder_draft', JSON.stringify({ sel: [...st.sel], leader: st.leader, name: st.name, deckIdx: st.deckIdx })); } catch { } }
   function loadDeck(d, idx = -1) {
     st.sel = new Set((d.cards || []).filter(id => CARDS[id])); st.leader = LEADERS[d.leader] ? d.leader : '';
-    st.name = d.name || ''; st.deckIdx = idx; $('#deckName').value = st.name; refresh();
+    st.name = d.name || ''; st.deckIdx = idx; refresh();
   }
-
-  $('#leader').innerHTML = '<option value="">（未選）</option>' + leaderIds.map(id => `<option value="${id}">${id} ${LEADERS[id].name}</option>`).join('');
-  $('#leader').onchange = e => { st.leader = e.target.value; refresh(); };
-  $('#deckName').oninput = e => { st.name = e.target.value; persistDraft(); };
-  $('#myDecks').onchange = e => { const i = +e.target.value; if (i < 0) { loadDeck({}, -1); return; } loadDeck(loadMyDecks()[i], i); toast('已載入'); };
   const current = () => ({ name: st.name.trim() || '自訂牌組', leader: st.leader, cards: sorted(), updated: new Date().toISOString() });
   function save(asNew) {
-    if (!st.sel.size) { toast('還沒選卡'); return; }
+    if (!st.sel.size) { toast('還沒選卡'); return false; }
     const list = loadMyDecks();
     if (asNew || st.deckIdx < 0 || !list[st.deckIdx]) { list.push(current()); st.deckIdx = list.length - 1; }
     else list[st.deckIdx] = current();
-    if (!saveMyDecks(list)) { toast('瀏覽器不允許儲存'); return; }
-    renderMyDecks(); persistDraft(); toast(deckProblems(sorted()).length ? '已儲存（張數還不符合規則，遊戲裡暫時不會出現）' : '已儲存，遊戲的牌組選單裡可以選');
+    if (!saveMyDecks(list)) { toast('瀏覽器不允許儲存'); return false; }
+    renderSide(); persistDraft(); toast(deckProblems(sorted()).length ? '已儲存（張數還不符合規則，遊戲裡暫時不會出現）' : '已儲存，遊戲的牌組選單裡可以選');
+    return true;
   }
-  $('#save').onclick = () => save(false);
-  $('#saveAs').onclick = () => save(true);
-  $('#del').onclick = () => {
-    const list = loadMyDecks(); if (st.deckIdx < 0 || !list[st.deckIdx]) return;
-    if (!confirm(`刪除「${list[st.deckIdx].name}」？`)) return;
-    list.splice(st.deckIdx, 1); saveMyDecks(list); st.deckIdx = -1; renderMyDecks(); toast('已刪除');
-  };
-  $('#clear').onclick = () => { st.sel.clear(); st.leader = ''; refresh(); };
-
   const gameUrl = () => new URL(`../beta/index.html#deck=${deckCode(current())}&name=${encodeURIComponent(current().name)}`, location.href).href;
   const builderUrl = () => new URL(`./#deck=${deckCode(current())}&name=${encodeURIComponent(current().name)}`, location.href).href;
-  $('#play').onclick = () => { save(false); location.href = gameUrl(); };
   function dialog(html, onOk) {
     const m = $('#dialog'); m.innerHTML = ''; const d = el('div', 'dlg', html); m.appendChild(d); m.hidden = false;
     const close = () => m.hidden = true; m.onclick = e => { if (e.target === m) close(); };
     d.querySelectorAll('[data-close]').forEach(b => b.onclick = close);
     d.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => { const t = d.querySelector(b.dataset.copy); t.select(); navigator.clipboard?.writeText(t.value).then(() => toast('已複製'), () => { document.execCommand('copy'); toast('已複製'); }); });
     if (onOk) d.querySelector('[data-ok]').onclick = () => { if (onOk(d) !== false) close(); };
+    return { d, close };
   }
-  $('#share').onclick = () => dialog(`<h3 style="margin:0">分享牌組</h3>
-    <label>牌組代碼（貼到「匯入代碼」）<textarea id="sCode" readonly>${deckCode(current())}</textarea></label>
+  // 牌組名稱＋隊長：只在儲存、輸出時才需要
+  const leaderOpts = () => '<option value="">（未選）</option>' + leaderIds.map(id => `<option value="${id}"${st.leader === id ? ' selected' : ''}>${id} ${LEADERS[id].name}．${LEADERS[id].skill}</option>`).join('');
+  const nameLeaderFields = () => `<label>牌組名稱<input type="text" id="dName" maxlength="20" placeholder="例：火草速攻" value="${esc(st.name)}"></label>
+    <label>隊長<select id="dLeader">${leaderOpts()}</select></label>`;
+  const readFields = d => { st.name = d.querySelector('#dName').value; st.leader = d.querySelector('#dLeader').value; refresh(); };
+  $('#saveBtn').onclick = () => {
+    const editing = st.deckIdx >= 0 && loadMyDecks()[st.deckIdx];
+    const { d, close } = dialog(`<h3>儲存牌組</h3>${nameLeaderFields()}
+      <div class="btns"><button class="btn primary" id="dSave">${editing ? '儲存（覆蓋原牌組）' : '儲存'}</button>${editing ? '<button class="btn" id="dSaveAs">另存新牌組</button>' : ''}<button class="btn" data-close>取消</button></div>`);
+    d.querySelector('#dSave').onclick = () => { readFields(d); if (save(false)) close(); };
+    if (editing) d.querySelector('#dSaveAs').onclick = () => { readFields(d); if (save(true)) close(); };
+    d.querySelector('#dName').focus();
+  };
+  $('#outBtn').onclick = () => {
+    const probs = deckProblems(sorted());
+    const { d, close } = dialog(`<h3>輸出</h3>${nameLeaderFields()}
+      <div class="btns"><button class="btn primary" id="oPlay"${probs.length ? ' disabled' : ''}>用這副牌開打</button><button class="btn" id="oShare">分享連結／代碼</button></div>
+      ${probs.length ? `<p class="hint">開打需要符合構築規則：${esc(probs.join('；'))}</p>` : ''}
+      <div class="btns"><button class="btn" id="oPrint">A4 列印／PDF</button><button class="btn" id="oJson">匯出 JSON</button></div>
+      <div class="btns"><button class="btn" data-close>關閉</button></div>`);
+    d.querySelector('#oPlay').onclick = () => { readFields(d); if (save(false)) location.href = gameUrl(); };
+    d.querySelector('#oShare').onclick = () => { readFields(d); share(); };
+    d.querySelector('#oPrint').onclick = () => { readFields(d); close(); tab('print'); };
+    d.querySelector('#oJson').onclick = () => { readFields(d); exportJson(); };
+  };
+  function share() {
+    dialog(`<h3>分享牌組</h3>
+    <label>牌組代碼（貼到「匯入」）<textarea id="sCode" readonly>${deckCode(current())}</textarea></label>
     <div class="btns"><button class="btn" data-copy="#sCode">複製代碼</button></div>
     <label>對戰連結（對方打開後，牌組選單會多一個「${esc(current().name)}」）<textarea id="sGame" readonly>${gameUrl()}</textarea></label>
     <div class="btns"><button class="btn" data-copy="#sGame">複製對戰連結</button></div>
     <label>構築連結（打開後可以繼續編輯）<textarea id="sBuild" readonly>${builderUrl()}</textarea></label>
     <div class="btns"><button class="btn" data-copy="#sBuild">複製構築連結</button><button class="btn" data-close>關閉</button></div>`);
-  $('#import').onclick = () => dialog(`<h3 style="margin:0">匯入牌組</h3>
-    <p class="hint">貼上牌組代碼、分享連結，或任何含有卡牌編號的文字（例：L03 F01 F03 W12…），也可以貼匯出的 JSON。</p>
-    <textarea id="iCode" placeholder="L03.F01.F03…"></textarea>
-    <div class="btns"><button class="btn primary" data-ok>匯入</button><button class="btn" data-close>取消</button></div>`, d => {
-      const raw = d.querySelector('#iCode').value; let deck;
-      try { const j = JSON.parse(raw); deck = Array.isArray(j) ? null : j; if (Array.isArray(j)) { const list = loadMyDecks().concat(j.filter(x => x && Array.isArray(x.cards))); saveMyDecks(list); renderMyDecks(); toast(`已匯入 ${j.length} 副牌組`); return; } } catch { }
-      if (!deck) { const h = raw.includes('deck=') ? new URLSearchParams(raw.slice(raw.indexOf('#') + 1)) : null; deck = { ...parseDeckCode(h ? h.get('deck') : raw), name: h && h.get('name') || '' }; }
-      if (!deck.cards || !deck.cards.length) { toast('找不到卡牌編號'); return false; }
-      loadDeck(deck, -1); toast(`已匯入 ${deck.cards.length} 張`);
-    });
-  $('#exportJson').onclick = () => {
+  }
+  function exportJson() {
     const blob = new Blob([JSON.stringify(loadMyDecks().length ? loadMyDecks() : [current()], null, 2)], { type: 'application/json' });
     const a = el('a'); a.href = URL.createObjectURL(blob); a.download = '召喚_我的牌組.json'; a.click(); URL.revokeObjectURL(a.href);
+  }
+  $('#loadBtn').onclick = function openDecks() {
+    const list = loadMyDecks();
+    const { d, close } = dialog(`<h3>我的牌組</h3>
+      <div class="decklist">${list.length ? list.map((x, i) => {
+        const c = { F: 0, W: 0, G: 0 }; x.cards.forEach(id => CARDS[id] && c[id[0]]++);
+        return `<div class="${i === st.deckIdx ? 'cur' : ''}"><span><b>${esc(x.name || '未命名')}</b><small>火 ${c.F}．水 ${c.W}．草 ${c.G}．共 ${x.cards.length} 張${LEADERS[x.leader] ? `．${esc(LEADERS[x.leader].name)}` : ''}</small></span>
+          <button class="btn small" data-load="${i}">載入</button><button class="btn small" data-del="${i}">刪除</button></div>`;
+      }).join('') : '<p class="hint">還沒有儲存的牌組。</p>'}</div>
+      <label>匯入：貼上牌組代碼、分享連結、卡號清單或 JSON<textarea id="iCode" placeholder="L03.F01.F03…"></textarea></label>
+      <div class="btns"><button class="btn" data-ok>匯入</button><button class="btn" id="dNew">開新牌組</button><button class="btn" data-close>關閉</button></div>`, d => {
+        const raw = d.querySelector('#iCode').value; let deck;
+        try { const j = JSON.parse(raw); if (Array.isArray(j)) { saveMyDecks(loadMyDecks().concat(j.filter(x => x && Array.isArray(x.cards)))); renderSide(); toast(`已匯入 ${j.length} 副牌組`); return; } deck = j; } catch { }
+        if (!deck) { const h = raw.includes('deck=') ? new URLSearchParams(raw.slice(raw.indexOf('#') + 1)) : null; deck = { ...parseDeckCode(h ? h.get('deck') : raw), name: h && h.get('name') || '' }; }
+        if (!deck.cards || !deck.cards.length) { toast('找不到卡牌編號'); return false; }
+        loadDeck(deck, -1); toast(`已匯入 ${deck.cards.length} 張`);
+      });
+    d.querySelectorAll('[data-load]').forEach(b => b.onclick = () => { const i = +b.dataset.load; loadDeck(loadMyDecks()[i], i); close(); toast('已載入'); });
+    d.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+      const i = +b.dataset.del, l = loadMyDecks(); if (!confirm(`刪除「${l[i].name}」？`)) return;
+      l.splice(i, 1); saveMyDecks(l); if (st.deckIdx === i) st.deckIdx = -1; else if (st.deckIdx > i) st.deckIdx--;
+      renderSide(); persistDraft(); close(); openDecks();
+    });
+    d.querySelector('#dNew').onclick = () => { loadDeck({}, -1); close(); };
   };
+  $('#clear').onclick = () => { if (st.sel.size && !confirm('清空目前勾選的卡？')) return; st.sel.clear(); st.leader = ''; refresh(); };
 
   // ---------- 上方按鈕 ----------
   $('#fText').oninput = e => { st.text = e.target.value; renderGrid(); };
@@ -392,7 +412,6 @@ aside label input,aside label select{color:var(--text);font-size:14px}
     scrollTo(0, 0);
   }
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => tab(t.dataset.tab));
-  $('#toPrint').onclick = () => tab('print');
 
   // ---------- A4 列印 ----------
   const MM = { pw: 210, ph: 297, cw: 63, ch: 88 };
@@ -515,7 +534,7 @@ aside label input,aside label select{color:var(--text);font-size:14px}
   const h = new URLSearchParams(location.hash.slice(1));
   if (h.get('deck')) loadDeck({ ...parseDeckCode(h.get('deck')), name: h.get('name') || '' });
   else { try { const d = JSON.parse(sessionStorage.getItem('summon_builder_draft') || 'null'); if (d) { loadDeck({ cards: d.sel, leader: d.leader, name: d.name }, d.deckIdx); } } catch { } }
-  renderFilters(); refresh();
+  renderFilters(); refresh(); showDetail('');
 })();
 </script>
 </body>
