@@ -1,4 +1,4 @@
-// 召喚 vj.1030.0 卡牌資料（108 張；fa＝啟動效果代號、fs＝獻祭效果代號，由規則引擎實作）
+// 召喚 vj.1030.0 卡牌資料（共用：beta/ 遊戲與 builder/ 構築都讀這一份）（108 張；fa＝啟動效果代號、fs＝獻祭效果代號，由規則引擎實作）
 const COLOR_NAME = { F: '火', W: '水', G: '草', N: '無' };
 const BEATS = { F: 'G', G: 'W', W: 'F' }; // 火剋草、草剋水、水剋火
 
@@ -151,10 +151,20 @@ function randomDeckIds(rand = Math.random) {
   }
 }
 
-// 卡圖：場上用小圖（cards/sm/，300px 寬），圖鑑大圖與對戰前畫面用原圖
-const img = (id, hi) => hi ? `cards/${id}.webp` : `cards/sm/${id}.webp`;
-// 開頁後在背景預載全部小圖，對戰中翻牌不用再等下載
-const IMG_CACHE = [];
-(window.requestIdleCallback || (f => setTimeout(f, 300)))(() => {
-  for (const id of [...Object.keys(CARDS), ...Object.keys(LEADERS)]) { const im = new Image(); im.decoding = 'async'; im.src = img(id); IMG_CACHE.push(im); }
-});
+// 卡圖放在 shared/cards/（原圖 600px）與 shared/cards/sm/（小圖 300px）。
+// 路徑以這支 data.js 的位置為準，所以 beta/、builder/ 或之後新增的頁面都能共用同一份卡圖。
+const SHARED_BASE = (document.currentScript && document.currentScript.src || location.href).replace(/[^/]*$/, '');
+const img = (id, hi) => hi ? `${SHARED_BASE}cards/${id}.webp` : `${SHARED_BASE}cards/sm/${id}.webp`;
+// 只預載「這一場用得到」的卡（雙方牌組＋隊長），卡池再大，載入量也不會跟著變大
+const IMG_CACHE = new Map();
+function preloadCards(ids, hi) {
+  const todo = [...new Set(ids)].filter(id => id && !IMG_CACHE.has(id + (hi ? '@hi' : '')));
+  if (!todo.length) return;
+  (window.requestIdleCallback || (f => setTimeout(f, 100)))(() => {
+    for (const id of todo) { const im = new Image(); im.decoding = 'async'; im.src = img(id, hi); IMG_CACHE.set(id + (hi ? '@hi' : ''), im); }
+  });
+}
+// 卡圖快取（service worker，見 /sw.js）：第二次進站起卡圖直接從本機讀取
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  try { navigator.serviceWorker.register(SHARED_BASE + '../sw.js').catch(() => {}); } catch { }
+}

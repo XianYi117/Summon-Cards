@@ -13,7 +13,7 @@
     if (id) c.dataset.id = id;
     if (o.uid) c.dataset.uid = o.uid;
     const nm = id && info(id) ? info(id).name : '卡背';
-    c.innerHTML = `<div class="inner"><div class="face">${id ? `<img src="${img(id, o.hi)}" alt="${id} ${nm}" decoding="async">` : ''}</div><div class="back"></div></div><div class="shade"></div><div class="glare"></div>`;
+    c.innerHTML = `<div class="inner"><div class="face">${id ? `<img src="${img(id, o.hi)}" alt="${id} ${nm}" decoding="async"${o.lazy ? ' loading="lazy"' : ''}>` : ''}</div><div class="back"></div></div><div class="shade"></div><div class="glare"></div>`;
     return c;
   }
   // 滑鼠懸停時卡片傾斜＋高亮；用 requestAnimationFrame 節流（每個畫面最多算一次），觸控裝置不啟用
@@ -95,12 +95,18 @@
     const dk = el('div', 'chips');
     for (const key of Object.keys(DECKS)) {
       const d = DECKS[key];
-      const sub = d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : '<small>27 張隨機 20 張．每屬性最多 8</small>';
+      const sub = d.fixed ? `<small>${d.custom ? '自訂．' : ''}${Object.entries(d.comp).filter(([, v]) => v).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}${d.leader ? `．${LEADERS[d.leader].name}` : ''}</small>` : d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : '<small>27 張隨機 20 張．每屬性最多 8</small>';
       const b = el('button', 'chip', `<span>${d.label}</span>${sub}`); b.setAttribute('aria-pressed', s.deck === key);
-      b.onclick = () => { s.deck = key; if (s.leader === 'L11' && !s.mainTouched && d.comp) s.main = Object.keys(d.comp)[0]; renderPick(); };
+      b.onclick = () => {
+        s.deck = key;
+        if (d.leader && !(net.on && net.myCfg)) { s.leader = d.leader; if (d.leader !== 'L11') delete s.main; }
+        if (s.leader === 'L11' && !s.mainTouched && d.comp) s.main = Object.entries(d.comp).sort((a, b) => b[1] - a[1])[0][0];
+        renderPick();
+      };
       dk.appendChild(b);
     }
     inf.appendChild(dk);
+    const bl = el('a', 'btn ghost small', '＋ 卡牌構築（自訂牌組）'); bl.href = '../builder/'; bl.style.justifySelf = 'start'; inf.appendChild(bl);
     const ok = s.leader && s.deck && (s.leader !== 'L11' || s.main);
     const act = el('div', 'pick-actions');
     const next = el('button', 'btn primary', net.on ? (net.myCfg ? '已準備，等待對手…' : '準備完成') : isFoe ? '確認對手' : '下一步'); next.disabled = !ok || (net.on && !!net.myCfg);
@@ -112,6 +118,7 @@
   $('#pickBack').onclick = () => { if (net.on) { if (net.conn) net.send({ k: 'bye' }); net.close(); show('home'); return; } if (pickStep === 'foe') { pickStep = 'me'; renderPick(); } else show('home'); };
   // 依牌組類型抽出 20 張（每色張數照設定，色內隨機）
   function rollDeck(type) {
+    if (DECKS[type] && DECKS[type].fixed) return DECKS[type].fixed.slice();
     const comp = (DECKS[type] || DECKS.RND).comp;
     if (!comp) return randomDeckIds();
     const out = [];
@@ -151,10 +158,11 @@
       const id = s.realLeader || s.leader;
       const c = cardEl(id, { hi: true }); tilt(c, 10); box.appendChild(c);
       box.appendChild(el('div', 'nm', `${who}．${LEADERS[id].name}`));
-      box.appendChild(el('div', 'dk', `牌組：${DECKS[s.deckType || s.deck].label}${s.main ? `．宣告主色 <span class="ctag ${s.main}">${COLOR_NAME[s.main]}</span>` : ''}${s.leader === 'RANDOM' || s.randLeader ? '．隨機隊長' : ''}`));
+      box.appendChild(el('div', 'dk', `牌組：${s.deckLabel || (DECKS[s.deckType || s.deck] || { label: '自訂' }).label}${s.main ? `．宣告主色 <span class="ctag ${s.main}">${COLOR_NAME[s.main]}</span>` : ''}${s.leader === 'RANDOM' || s.randLeader ? '．隨機隊長' : ''}`));
     };
+    preloadCards([cfg.me.realLeader, cfg.foe.realLeader, ...(cfg.me.cards || []), ...(cfg.foe.cards || [])]);
     side($('#vsFoe'), cfg.foe, '對手'); side($('#vsMe'), cfg.me, '我方');
-    $('#vsReroll').hidden = net.on;
+    $('#vsReroll').hidden = net.on || !!(DECKS[cfg.me.deck] && DECKS[cfg.me.deck].fixed);
   }
   $('#vsBack').onclick = () => { pickStep = 'me'; renderPick(); show('pick'); };
   $('#vsStart').onclick = () => startBattle();
@@ -215,7 +223,7 @@
     const grid = $('#galGrid'); grid.innerHTML = '';
     const ids = [...Object.keys(CARDS), ...leaderIds].filter(id => (f.col === 'all' || (f.col === 'L' ? id[0] === 'L' : id[0] === f.col)) && (f.role === 'all' || (id[0] !== 'L' && CARDS[id].roles.includes(f.role))));
     for (const id of ids) {
-      const c = cardEl(id, { hi: true }); c.tabIndex = 0; c.setAttribute('role', 'button');
+      const c = cardEl(id, { lazy: true }); c.tabIndex = 0; c.setAttribute('role', 'button');
       c.onclick = () => openBig(id); c.onkeydown = e => { if (e.key === 'Enter') openBig(id); };
       grid.appendChild(c);
     }
@@ -307,6 +315,7 @@
       rec.begin({ seed, cfgs: players });
     }
     rec.ui();
+    preloadCards(G.p.flatMap(p => [p.leader, ...p.deck.map(c => c.id), ...p.hand.map(c => c.id)]));
     $('#netState').hidden = true; $('#deckView').hidden = true; sacTurn.clear();
     mode = 'idle'; sel = []; fresh = new Set(G.p[ME].hand.map(c => c.uid)); freshPlay.clear(); freshStatue.clear(); sacFx.clear(); revealed = false; lastSettle = null; logs = [];
     t0 = Date.now(); tEnd = 0; clearInterval(clockT); clockT = setInterval(tickClock, 1000); tickClock();
@@ -919,7 +928,7 @@
     toPick() { this.myCfg = null; cfg = { me: {}, foe: {} }; pickStep = 'me'; renderPick(); show('pick'); renderNetPick(); },
     ready() {
       const s = cfg.me; resolveSide(s);
-      this.myCfg = { leader: s.realLeader, deck: s.cards, deckType: s.deck, main: s.realLeader === 'L11' ? s.main : undefined, randLeader: s.leader === 'RANDOM' };
+      this.myCfg = { leader: s.realLeader, deck: s.cards, deckType: s.deck, deckLabel: (DECKS[s.deck] || {}).label, main: s.realLeader === 'L11' ? s.main : undefined, randLeader: s.leader === 'RANDOM' };
       this.send({ k: 'cfg', cfg: this.myCfg }); renderNetPick();
       if (this.host) this.tryStart();
     },

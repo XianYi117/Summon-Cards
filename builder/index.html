@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>卡牌構築．列印｜召喚 SUMMON</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;900&display=swap">
+<style>
+:root{
+  --ink:#0d1016; --stone:#1a1f28; --stone-2:#232a35; --line:#3a4352;
+  --gold:#c9a45c; --gold-hi:#f1d491; --text:#ebe5d6; --muted:#98a0aa;
+  --F:#d9442e; --W:#2f7fd8; --G:#3fae4a; --N:#8b8f99; --ok:#6cc18a; --bad:#e0604e;
+  --f-display:"Noto Serif TC","Songti TC",serif; --f-body:"Noto Sans TC","PingFang TC",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--ink);color:var(--text);font:14px/1.5 var(--f-body)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--gold-hi)}
+header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 18px;background:#0d1016ee;backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+header h1{margin:0;font:900 22px var(--f-display);letter-spacing:.1em}
+header h1 small{font:500 12px var(--f-body);color:var(--muted);letter-spacing:.05em;margin-left:8px}
+.tabs{display:flex;gap:4px;margin-left:auto}
+.tab,.btn{border:1px solid var(--line);background:var(--stone);padding:7px 14px;border-radius:5px;white-space:nowrap;text-decoration:none;color:var(--text)}
+.tab[aria-selected=true]{border-color:var(--gold);color:var(--gold-hi);background:#2a2518}
+.btn:hover,.tab:hover{border-color:var(--gold)}
+.btn.primary{background:linear-gradient(#d8b46a,#9c7a39);color:#1b1408;border-color:var(--gold-hi);font-weight:700}
+.btn.small{padding:4px 10px;font-size:13px}
+.btn:disabled{opacity:.4;cursor:default}
+
+/* 構築畫面 */
+#build{display:grid;grid-template-columns:1fr 330px;gap:0;min-height:calc(100vh - 56px)}
+.main{padding:14px 18px;min-width:0}
+.filters{display:grid;gap:8px;margin-bottom:12px}
+.frow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.frow > b{width:44px;color:var(--muted);font-weight:500;font-size:13px}
+.chip{border:1px solid var(--line);background:var(--stone);border-radius:999px;padding:3px 12px;font-size:13px}
+.chip[aria-pressed=true]{border-color:var(--gold);background:#3a311c;color:var(--gold-hi)}
+.chip.F[aria-pressed=true]{background:var(--F);border-color:var(--F);color:#fff}
+.chip.W[aria-pressed=true]{background:var(--W);border-color:var(--W);color:#fff}
+.chip.G[aria-pressed=true]{background:var(--G);border-color:var(--G);color:#fff}
+.chip.L[aria-pressed=true]{background:#6b5a8e;border-color:#9a86c6;color:#fff}
+input[type=search],select,input[type=text],input[type=number]{background:var(--stone);border:1px solid var(--line);border-radius:5px;padding:5px 9px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 12px;color:var(--muted);font-size:13px}
+.bar .sp{flex:1}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.grid.list{grid-template-columns:1fr}
+.cell{position:relative;border-radius:8px;padding:6px;background:var(--stone);border:2px solid transparent;cursor:pointer;transition:border-color .15s,transform .15s}
+.cell:hover{transform:translateY(-2px)}
+.cell.on{border-color:var(--gold-hi);background:#2a2518}
+.cell.dim{opacity:.45}
+.cell img{width:100%;aspect-ratio:750/1050;display:block;border-radius:6px;object-fit:cover;background:#222}
+.cell .cap{display:flex;align-items:center;gap:6px;margin-top:5px;font-size:13px}
+.cell .cap input{width:17px;height:17px;accent-color:var(--gold);margin:0}
+.cell .cap b{font-weight:700}
+.cell .zoom{position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:50%;border:none;background:#000a;color:#fff;font-size:14px;opacity:0;transition:opacity .15s}
+.cell:hover .zoom,.cell:focus-within .zoom{opacity:1}
+.cell .tx{display:none;font-size:12.5px;color:#cfc8b8}
+.cell .tx i{font-style:normal;display:inline-block;background:#000;color:#fff;font-size:11px;padding:0 5px;border-radius:3px;margin-right:5px}
+.cell .tx .role{color:var(--muted)}
+.grid.list .cell{display:grid;grid-template-columns:70px 1fr;gap:12px;align-items:center}
+.grid.list .cell img{width:70px}
+.grid.list .cell .zoom{display:none}
+.grid.list .cell .tx{display:grid;gap:2px}
+.grid.list .cell .cap{margin:0}
+.grid.list .info{display:grid;gap:3px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
+.dot.F{background:var(--F)}.dot.W{background:var(--W)}.dot.G{background:var(--G)}.dot.N{background:var(--N)}
+.empty{color:var(--muted);padding:40px;text-align:center}
+
+/* 側欄 */
+aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;position:sticky;top:56px;height:calc(100vh - 56px);overflow:auto;display:flex;flex-direction:column;gap:12px}
+aside h2{margin:0;font:700 16px var(--f-display);letter-spacing:.08em;color:var(--gold-hi)}
+aside label{display:grid;gap:3px;font-size:12.5px;color:var(--muted)}
+aside label input,aside label select{color:var(--text);font-size:14px}
+.counts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
+.counts div{background:var(--stone);border-radius:6px;padding:6px 2px;font-size:12px;color:var(--muted);border-bottom:3px solid var(--line)}
+.counts div b{display:block;font-size:20px;color:var(--text)}
+.counts .F{border-color:var(--F)}.counts .W{border-color:var(--W)}.counts .G{border-color:var(--G)}
+.counts .over b{color:var(--bad)}
+.status{font-size:13px;padding:7px 10px;border-radius:6px;background:#2b1b1b;color:#f2b4a9}
+.status.ok{background:#1b2b20;color:#9fe0b4}
+.sel{display:grid;gap:2px;font-size:13px;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:6px}
+.sel div{display:flex;gap:6px;align-items:center}
+.sel div span.dot{flex:none}
+.sel div span:not(.dot){flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sel button{border:none;background:none;color:var(--muted);padding:0 4px}
+.sel button:hover{color:var(--bad)}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+.btns .btn{flex:1 1 auto;text-align:center}
+.hint{font-size:12px;color:var(--muted);margin:0}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2a2518;border:1px solid var(--gold);padding:8px 18px;border-radius:6px;z-index:99;transition:opacity .3s}
+
+/* 放大 / 對話框 */
+.modal{position:fixed;inset:0;background:#000c;display:grid;place-items:center;z-index:50;padding:16px}
+.modal img{max-height:90vh;max-width:92vw;border-radius:12px}
+.dlg{background:var(--stone);border:1px solid var(--gold);border-radius:10px;padding:18px;width:min(520px,94vw);display:grid;gap:10px}
+.dlg textarea{width:100%;min-height:90px;background:#0d1016;border:1px solid var(--line);border-radius:6px;padding:8px;color:var(--text);font:13px/1.4 ui-monospace,monospace}
+
+/* 列印畫面 */
+#print{padding:14px 18px}
+.pset{display:flex;flex-wrap:wrap;gap:14px;align-items:center;background:var(--stone);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:16px}
+.pset label{display:flex;gap:6px;align-items:center}
+.pset input[type=number]{width:62px}
+.sheets{display:grid;justify-content:center;gap:24px}
+.sheet{width:210mm;height:297mm;background:#fff;position:relative;box-shadow:0 6px 30px #000a;overflow:hidden}
+.sheet img{position:absolute;width:63mm;height:88mm;display:block}
+.sheet .cut{position:absolute;background:#888}
+.sheet .pno{position:absolute;bottom:5mm;right:8mm;font-size:9pt;color:#999}
+@media (max-width:860px){
+  #build{grid-template-columns:1fr}
+  aside{position:static;height:auto;border-left:none;border-top:1px solid var(--line)}
+  .sheets{zoom:.45}
+}
+@page{size:A4;margin:0}
+@media print{
+  body{background:#fff}
+  header,#build,.pset,.toast,.noprint{display:none!important}
+  #print{display:block!important;padding:0}
+  .sheets{display:block;zoom:1}
+  .sheet{box-shadow:none;page-break-after:always;break-after:page}
+  .sheet:last-child{page-break-after:auto;break-after:auto}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>召喚<small>卡牌構築．列印</small></h1>
+  <a class="btn small" href="../beta/">← 回遊戲</a>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="build" aria-selected="true">構築／總覽</button>
+    <button class="tab" role="tab" data-tab="print" aria-selected="false">A4 列印預覽</button>
+  </div>
+</header>
+
+<section id="build">
+  <div class="main">
+    <div class="filters">
+      <div class="frow"><b>屬性</b><span id="fAttr" class="frow"></span></div>
+      <div class="frow"><b>定位</b><span id="fRole" class="frow"></span></div>
+      <div class="frow"><b>種族</b><span id="fRace" class="frow"></span></div>
+      <div class="frow"><b>搜尋</b><input type="search" id="fText" placeholder="編號、名稱、效果文字…" style="flex:1;max-width:340px"></div>
+    </div>
+    <div class="bar">
+      <span id="shown"></span>
+      <label><input type="checkbox" id="onlySel"> 只看已勾選</label>
+      <span class="sp"></span>
+      <button class="btn small" id="selAll">勾選目前全部</button>
+      <button class="btn small" id="selNone">取消目前全部</button>
+      <button class="btn small" id="viewMode">列表檢視</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <aside>
+    <h2>我的牌組</h2>
+    <label>載入已存牌組
+      <select id="myDecks"></select>
+    </label>
+    <label>牌組名稱<input type="text" id="deckName" placeholder="例：火草速攻" maxlength="20"></label>
+    <label>隊長<select id="leader"></select></label>
+    <div class="counts">
+      <div class="F"><b id="cF">0</b>火／8</div>
+      <div class="W"><b id="cW">0</b>水／8</div>
+      <div class="G"><b id="cG">0</b>草／8</div>
+      <div><b id="cT">0</b>合計／20</div>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="sel" id="selList"></div>
+    <div class="btns">
+      <button class="btn primary" id="save">儲存</button>
+      <button class="btn" id="saveAs">另存新牌組</button>
+      <button class="btn" id="del">刪除</button>
+      <button class="btn" id="clear">清空</button>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="play">用這副牌開打</button>
+      <button class="btn" id="share">分享連結／代碼</button>
+      <button class="btn" id="import">匯入代碼</button>
+    </div>
+    <div class="btns">
+      <button class="btn" id="toPrint">A4 列印／PDF</button>
+      <button class="btn" id="exportJson">匯出 JSON</button>
+    </div>
+    <p class="hint">儲存的牌組會出現在遊戲「選擇牌組」裡（同一個瀏覽器）。要給別人用，按「分享連結」。只要列印不打牌的話，張數不用符合 20 張規則。</p>
+  </aside>
+</section>
+
+<section id="print" hidden>
+  <div class="pset noprint">
+    <label><input type="checkbox" id="pLeader" checked> 含隊長卡</label>
+    <label>每張 <input type="number" id="pCopies" min="1" max="9" value="1"> 份</label>
+    <label>卡片間距 <select id="pGap"><option value="0">0 mm（連在一起）</option><option value="2" selected>2 mm</option><option value="4">4 mm</option></select></label>
+    <label><input type="checkbox" id="pCut" checked> 裁切線</label>
+    <span id="pInfo" style="color:var(--muted)"></span>
+    <span style="flex:1"></span>
+    <button class="btn" id="doPrint">列印</button>
+    <button class="btn primary" id="doPdf">下載 PDF</button>
+  </div>
+  <p class="hint noprint" style="margin:-6px 0 14px">卡片尺寸 63×88 mm（標準卡牌），每頁 3×3。列印時請選「實際大小／100%」，不要「縮放至頁面大小」。</p>
+  <div class="sheets" id="sheets"></div>
+</section>
+
+<div class="modal" id="zoom" hidden></div>
+<div class="modal" id="dialog" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="../shared/data.js"></script>
+<script src="../shared/decks.js"></script>
+<script>
+(function () {
+  const $ = s => document.querySelector(s);
+  const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const cardIds = Object.keys(CARDS), leaderIds = Object.keys(LEADERS);
+  const isLeader = id => !!LEADERS[id];
+  const info = id => CARDS[id] || LEADERS[id];
+  const roles = id => CARDS[id] ? CARDS[id].role.split('、') : [];
+  const races = [...new Set(cardIds.map(id => CARDS[id].race))];
+
+  // ---------- 狀態 ----------
+  const st = { attr: new Set(), role: new Set(), race: new Set(), text: '', only: false, list: false,
+               sel: new Set(), leader: '', name: '', deckIdx: -1 };
+  const toast = msg => { const t = $('#toast'); t.textContent = msg; t.hidden = false; t.style.opacity = 1; clearTimeout(toast.t); toast.t = setTimeout(() => { t.style.opacity = 0; setTimeout(() => t.hidden = true, 300); }, 1800); };
+
+  // ---------- 篩選 ----------
+  function chips(box, items, set, cls) {
+    box.innerHTML = '';
+    const all = el('button', 'chip', '全部'); all.setAttribute('aria-pressed', set.size === 0);
+    all.onclick = () => { set.clear(); renderFilters(); renderGrid(); }; box.appendChild(all);
+    for (const [key, label] of items) {
+      const b = el('button', 'chip ' + (cls ? cls(key) : ''), label); b.setAttribute('aria-pressed', set.has(key));
+      b.onclick = () => { set.has(key) ? set.delete(key) : set.add(key); renderFilters(); renderGrid(); };
+      box.appendChild(b);
+    }
+  }
+  function renderFilters() {
+    chips($('#fAttr'), [['F', '火'], ['W', '水'], ['G', '草'], ['L', '隊長']], st.attr, k => k);
+    chips($('#fRole'), ROLES.map(r => [r, r]), st.role);
+    chips($('#fRace'), races.map(r => [r, r]), st.race);
+  }
+  function visible() {
+    const q = st.text.trim().toLowerCase();
+    return [...cardIds, ...leaderIds].filter(id => {
+      const d = info(id), L = isLeader(id);
+      if (st.only && !(L ? st.leader === id : st.sel.has(id))) return false;
+      if (st.attr.size && !st.attr.has(L ? 'L' : id[0])) return false;
+      if (st.role.size && (L || !roles(id).some(r => st.role.has(r)))) return false;
+      if (st.race.size && (L || !st.race.has(d.race))) return false;
+      if (q) { const hay = [id, d.name, d.race, d.act, d.sac, d.role, d.skill, d.text].filter(Boolean).join(' ').toLowerCase(); if (!hay.includes(q)) return false; }
+      // 預設（沒選屬性）時不顯示隊長以外的過濾…隊長只在「全部」或「隊長」時出現
+      if (L && st.attr.size === 0 && (st.role.size || st.race.size)) return false;
+      return true;
+    });
+  }
+
+  // ---------- 卡片格 ----------
+  function renderGrid() {
+    const g = $('#grid'); g.innerHTML = ''; g.classList.toggle('list', st.list);
+    const ids = visible();
+    $('#shown').textContent = `顯示 ${ids.length} 張`;
+    if (!ids.length) { g.appendChild(el('div', 'empty', '沒有符合條件的卡。')); return; }
+    const frag = document.createDocumentFragment();
+    for (const id of ids) {
+      const d = info(id), L = isLeader(id), on = L ? st.leader === id : st.sel.has(id);
+      const c = el('div', 'cell' + (on ? ' on' : ''));
+      c.dataset.id = id;
+      const color = L ? d.color : id[0];
+      c.innerHTML = `<img loading="lazy" src="${img(id)}" alt="${id} ${esc(d.name)}">
+        <div class="info"><div class="cap"><input type="${L ? 'radio' : 'checkbox'}" ${on ? 'checked' : ''} tabindex="-1" aria-label="選擇 ${id}"><span class="dot ${color}"></span><b>${id}</b>${esc(d.name)}<span style="color:var(--muted)">．${esc(d.race)}</span></div>
+        <div class="tx">${L ? `<span><i>${esc(d.skill)}</i>${esc(d.text)}</span><span class="role">隊長（單選）</span>`
+          : `<span><i>啟動</i>${esc(d.act)}</span><span><i style="background:#555">獻祭</i>${esc(d.sac)}</span><span class="role">定位：${esc(d.role)}</span>`}</div></div>
+        <button class="zoom" title="放大">🔍</button>`;
+      c.tabIndex = 0;
+      c.onclick = e => { if (e.target.closest('.zoom')) { zoom(id); return; } toggle(id); };
+      c.onkeydown = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(id); } };
+      frag.appendChild(c);
+    }
+    g.appendChild(frag);
+  }
+  function toggle(id) {
+    if (isLeader(id)) st.leader = st.leader === id ? '' : id;
+    else st.sel.has(id) ? st.sel.delete(id) : st.sel.add(id);
+    refresh();
+  }
+  function zoom(id) {
+    const m = $('#zoom'); m.innerHTML = `<img src="${img(id, true)}" alt="${id}">`; m.hidden = false; m.onclick = () => m.hidden = true;
+  }
+
+  // ---------- 側欄 ----------
+  const sorted = () => [...st.sel].sort();
+  function renderSide() {
+    const cards = sorted(), cnt = { F: 0, W: 0, G: 0 };
+    cards.forEach(id => cnt[id[0]]++);
+    for (const k of ['F', 'W', 'G']) { $('#c' + k).textContent = cnt[k]; $('#c' + k).parentNode.classList.toggle('over', cnt[k] > ATTR_MAX); }
+    $('#cT').textContent = cards.length; $('#cT').parentNode.classList.toggle('over', cards.length > 20);
+    const probs = deckProblems(cards);
+    const s = $('#status');
+    s.className = 'status' + (probs.length ? '' : ' ok');
+    s.textContent = probs.length ? '還不能對戰：' + probs.join('；') : `✓ 可以對戰${st.leader ? '' : '（尚未選隊長，可開打時再選）'}`;
+    $('#play').disabled = probs.length > 0;
+    const ls = $('#leader'); ls.value = st.leader;
+    const box = $('#selList'); box.innerHTML = '';
+    const rows = [...(st.leader ? [st.leader] : []), ...cards];
+    if (!rows.length) box.appendChild(el('div', '', '<span style="color:var(--muted)">點卡片勾選加入</span>'));
+    for (const id of rows) {
+      const d = info(id), L = isLeader(id);
+      const r = el('div', '', `<span class="dot ${L ? d.color : id[0]}"></span><span><b>${id}</b> ${esc(d.name)}${L ? '（隊長）' : ''}</span>`);
+      const x = el('button', '', '✕'); x.title = '移除'; x.onclick = () => toggle(id); r.appendChild(x); box.appendChild(r);
+    }
+    renderMyDecks();
+  }
+  function renderMyDecks() {
+    const list = loadMyDecks(), s = $('#myDecks');
+    s.innerHTML = `<option value="-1">— 新牌組 —</option>` + list.map((d, i) => `<option value="${i}">${esc(d.name || '未命名')}（${d.cards.length} 張）</option>`).join('');
+    s.value = st.deckIdx;
+    $('#del').disabled = st.deckIdx < 0;
+  }
+  function refresh() { renderGrid(); renderSide(); if (!$('#print').hidden) renderPrint(); persistDraft(); }
+  function persistDraft() { try { sessionStorage.setItem('summon_builder_draft', JSON.stringify({ sel: [...st.sel], leader: st.leader, name: st.name, deckIdx: st.deckIdx })); } catch { } }
+  function loadDeck(d, idx = -1) {
+    st.sel = new Set((d.cards || []).filter(id => CARDS[id])); st.leader = LEADERS[d.leader] ? d.leader : '';
+    st.name = d.name || ''; st.deckIdx = idx; $('#deckName').value = st.name; refresh();
+  }
+
+  $('#leader').innerHTML = '<option value="">（未選）</option>' + leaderIds.map(id => `<option value="${id}">${id} ${LEADERS[id].name}</option>`).join('');
+  $('#leader').onchange = e => { st.leader = e.target.value; refresh(); };
+  $('#deckName').oninput = e => { st.name = e.target.value; persistDraft(); };
+  $('#myDecks').onchange = e => { const i = +e.target.value; if (i < 0) { loadDeck({}, -1); return; } loadDeck(loadMyDecks()[i], i); toast('已載入'); };
+  const current = () => ({ name: st.name.trim() || '自訂牌組', leader: st.leader, cards: sorted(), updated: new Date().toISOString() });
+  function save(asNew) {
+    if (!st.sel.size) { toast('還沒選卡'); return; }
+    const list = loadMyDecks();
+    if (asNew || st.deckIdx < 0 || !list[st.deckIdx]) { list.push(current()); st.deckIdx = list.length - 1; }
+    else list[st.deckIdx] = current();
+    if (!saveMyDecks(list)) { toast('瀏覽器不允許儲存'); return; }
+    renderMyDecks(); persistDraft(); toast(deckProblems(sorted()).length ? '已儲存（張數還不符合規則，遊戲裡暫時不會出現）' : '已儲存，遊戲的牌組選單裡可以選');
+  }
+  $('#save').onclick = () => save(false);
+  $('#saveAs').onclick = () => save(true);
+  $('#del').onclick = () => {
+    const list = loadMyDecks(); if (st.deckIdx < 0 || !list[st.deckIdx]) return;
+    if (!confirm(`刪除「${list[st.deckIdx].name}」？`)) return;
+    list.splice(st.deckIdx, 1); saveMyDecks(list); st.deckIdx = -1; renderMyDecks(); toast('已刪除');
+  };
+  $('#clear').onclick = () => { st.sel.clear(); st.leader = ''; refresh(); };
+
+  const gameUrl = () => new URL(`../beta/index.html#deck=${deckCode(current())}&name=${encodeURIComponent(current().name)}`, location.href).href;
+  const builderUrl = () => new URL(`./#deck=${deckCode(current())}&name=${encodeURIComponent(current().name)}`, location.href).href;
+  $('#play').onclick = () => { save(false); location.href = gameUrl(); };
+  function dialog(html, onOk) {
+    const m = $('#dialog'); m.innerHTML = ''; const d = el('div', 'dlg', html); m.appendChild(d); m.hidden = false;
+    const close = () => m.hidden = true; m.onclick = e => { if (e.target === m) close(); };
+    d.querySelectorAll('[data-close]').forEach(b => b.onclick = close);
+    d.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => { const t = d.querySelector(b.dataset.copy); t.select(); navigator.clipboard?.writeText(t.value).then(() => toast('已複製'), () => { document.execCommand('copy'); toast('已複製'); }); });
+    if (onOk) d.querySelector('[data-ok]').onclick = () => { if (onOk(d) !== false) close(); };
+  }
+  $('#share').onclick = () => dialog(`<h3 style="margin:0">分享牌組</h3>
+    <label>牌組代碼（貼到「匯入代碼」）<textarea id="sCode" readonly>${deckCode(current())}</textarea></label>
+    <div class="btns"><button class="btn" data-copy="#sCode">複製代碼</button></div>
+    <label>對戰連結（對方打開後，牌組選單會多一個「${esc(current().name)}」）<textarea id="sGame" readonly>${gameUrl()}</textarea></label>
+    <div class="btns"><button class="btn" data-copy="#sGame">複製對戰連結</button></div>
+    <label>構築連結（打開後可以繼續編輯）<textarea id="sBuild" readonly>${builderUrl()}</textarea></label>
+    <div class="btns"><button class="btn" data-copy="#sBuild">複製構築連結</button><button class="btn" data-close>關閉</button></div>`);
+  $('#import').onclick = () => dialog(`<h3 style="margin:0">匯入牌組</h3>
+    <p class="hint">貼上牌組代碼、分享連結，或任何含有卡牌編號的文字（例：L03 F01 F03 W12…），也可以貼匯出的 JSON。</p>
+    <textarea id="iCode" placeholder="L03.F01.F03…"></textarea>
+    <div class="btns"><button class="btn primary" data-ok>匯入</button><button class="btn" data-close>取消</button></div>`, d => {
+      const raw = d.querySelector('#iCode').value; let deck;
+      try { const j = JSON.parse(raw); deck = Array.isArray(j) ? null : j; if (Array.isArray(j)) { const list = loadMyDecks().concat(j.filter(x => x && Array.isArray(x.cards))); saveMyDecks(list); renderMyDecks(); toast(`已匯入 ${j.length} 副牌組`); return; } } catch { }
+      if (!deck) { const h = raw.includes('deck=') ? new URLSearchParams(raw.slice(raw.indexOf('#') + 1)) : null; deck = { ...parseDeckCode(h ? h.get('deck') : raw), name: h && h.get('name') || '' }; }
+      if (!deck.cards || !deck.cards.length) { toast('找不到卡牌編號'); return false; }
+      loadDeck(deck, -1); toast(`已匯入 ${deck.cards.length} 張`);
+    });
+  $('#exportJson').onclick = () => {
+    const blob = new Blob([JSON.stringify(loadMyDecks().length ? loadMyDecks() : [current()], null, 2)], { type: 'application/json' });
+    const a = el('a'); a.href = URL.createObjectURL(blob); a.download = '召喚_我的牌組.json'; a.click(); URL.revokeObjectURL(a.href);
+  };
+
+  // ---------- 上方按鈕 ----------
+  $('#fText').oninput = e => { st.text = e.target.value; renderGrid(); };
+  $('#onlySel').onchange = e => { st.only = e.target.checked; renderGrid(); };
+  $('#viewMode').onclick = () => { st.list = !st.list; $('#viewMode').textContent = st.list ? '卡圖檢視' : '列表檢視'; renderGrid(); };
+  $('#selAll').onclick = () => { visible().filter(id => !isLeader(id)).forEach(id => st.sel.add(id)); refresh(); };
+  $('#selNone').onclick = () => { visible().forEach(id => isLeader(id) ? (st.leader === id && (st.leader = '')) : st.sel.delete(id)); refresh(); };
+  function tab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === name));
+    $('#build').hidden = name !== 'build'; $('#print').hidden = name !== 'print';
+    if (name === 'print') renderPrint();
+    scrollTo(0, 0);
+  }
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => tab(t.dataset.tab));
+  $('#toPrint').onclick = () => tab('print');
+
+  // ---------- A4 列印 ----------
+  const MM = { pw: 210, ph: 297, cw: 63, ch: 88 };
+  function printList() {
+    const ids = [...($('#pLeader').checked && st.leader ? [st.leader] : []), ...sorted()];
+    const n = Math.max(1, Math.min(9, +$('#pCopies').value || 1)), out = [];
+    ids.forEach(id => { for (let i = 0; i < n; i++) out.push(id); });
+    return out;
+  }
+  function layout() {
+    const g = +$('#pGap').value, x0 = (MM.pw - 3 * MM.cw - 2 * g) / 2, y0 = (MM.ph - 3 * MM.ch - 2 * g) / 2;
+    const pos = []; for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) pos.push([x0 + c * (MM.cw + g), y0 + r * (MM.ch + g)]);
+    // 裁切線：畫在版面外側的白邊上（不壓到卡）
+    const xs = [], ys = [];
+    for (let c = 0; c < 3; c++) xs.push(x0 + c * (MM.cw + g), x0 + c * (MM.cw + g) + MM.cw);
+    for (let r = 0; r < 3; r++) ys.push(y0 + r * (MM.ch + g), y0 + r * (MM.ch + g) + MM.ch);
+    return { pos, x0, y0, x1: MM.pw - x0, y1: MM.ph - y0, xs: [...new Set(xs.map(v => +v.toFixed(2)))], ys: [...new Set(ys.map(v => +v.toFixed(2)))] };
+  }
+  function renderPrint() {
+    const ids = printList(), L = layout(), box = $('#sheets'); box.innerHTML = '';
+    const pages = Math.ceil(ids.length / 9);
+    $('#pInfo').textContent = ids.length ? `共 ${ids.length} 張．${pages} 頁` : '';
+    $('#doPrint').disabled = $('#doPdf').disabled = !ids.length;
+    if (!ids.length) { box.appendChild(el('div', 'empty', '還沒有勾選卡片。回到「構築／總覽」勾選要列印的卡。')); return; }
+    for (let p = 0; p < pages; p++) {
+      const sh = el('div', 'sheet');
+      if ($('#pCut').checked) {
+        const len = 5;
+        for (const x of L.xs) { sh.appendChild(cut(x, L.y0 - len - 1, .2, len)); sh.appendChild(cut(x, L.y1 + 1, .2, len)); }
+        for (const y of L.ys) { sh.appendChild(cut(L.x0 - len - 1, y, len, .2)); sh.appendChild(cut(L.x1 + 1, y, len, .2)); }
+      }
+      ids.slice(p * 9, p * 9 + 9).forEach((id, k) => {
+        const im = el('img'); im.src = img(id, true); im.alt = id;
+        im.style.left = L.pos[k][0] + 'mm'; im.style.top = L.pos[k][1] + 'mm'; sh.appendChild(im);
+      });
+      sh.appendChild(el('div', 'pno', `召喚．${esc(st.name || '自訂')}．${p + 1}/${pages}`));
+      box.appendChild(sh);
+    }
+    function cut(x, y, w, h) { const d = el('div', 'cut'); Object.assign(d.style, { left: x + 'mm', top: y + 'mm', width: w + 'mm', height: h + 'mm' }); return d; }
+  }
+  ['#pLeader', '#pCopies', '#pGap', '#pCut'].forEach(s => $(s).oninput = $(s).onchange = renderPrint);
+  $('#doPrint').onclick = () => window.print();
+
+  // 卡圖轉 JPEG（PDF 可直接內嵌 JPEG，不需要外部函式庫）
+  function toJpeg(src) {
+    return new Promise((ok, bad) => {
+      const im = new Image();
+      im.onload = () => {
+        const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+        const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(im, 0, 0);
+        cv.toBlob(b => b ? b.arrayBuffer().then(buf => ok({ bytes: new Uint8Array(buf), w: cv.width, h: cv.height }), bad) : bad(new Error('轉檔失敗')), 'image/jpeg', .93);
+      };
+      im.onerror = () => bad(new Error('卡圖載入失敗：' + src)); im.src = src;
+    });
+  }
+  // 最小 PDF 產生器：pages = [{ items:[{img, x, y, w, h}], lines:[[x1,y1,x2,y2]] }]（單位 mm，原點左上）
+  function buildPdf(pages, images, title) {
+    const pt = v => (v * 72 / 25.4).toFixed(2), PH = 297;
+    const enc = new TextEncoder(), parts = [], offs = [];
+    let len = 0;
+    const push = d => { const u = typeof d === 'string' ? enc.encode(d) : d; parts.push(u); len += u.length; };
+    const objs = []; // 依序配置物件編號
+    const alloc = () => objs.push(null);
+    const catalog = alloc(), pagesId = alloc();
+    const imgIds = {}; for (const k in images) imgIds[k] = alloc();
+    const pageIds = pages.map(() => [alloc(), alloc()]);
+    const info = alloc();
+    const begin = n => { offs[n] = len; push(`${n} 0 obj\n`); };
+    push('%PDF-1.4\n'); push(new Uint8Array([37, 226, 227, 207, 211, 10]));
+    begin(catalog); push(`<< /Type /Catalog /Pages ${pagesId} 0 R >>\nendobj\n`);
+    begin(pagesId); push(`<< /Type /Pages /Count ${pages.length} /Kids [${pageIds.map(p => p[0] + ' 0 R').join(' ')}] >>\nendobj\n`);
+    const names = {}; let ni = 0;
+    for (const k in images) {
+      const im = images[k]; names[k] = 'Im' + (++ni);
+      begin(imgIds[k]); push(`<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.bytes.length} >>\nstream\n`);
+      push(im.bytes); push('\nendstream\nendobj\n');
+    }
+    pages.forEach((pg, i) => {
+      const [pid, cid] = pageIds[i];
+      let c = '';
+      if (pg.lines.length) { c += '0.5 G 0.57 w\n'; for (const [x1, y1, x2, y2] of pg.lines) c += `${pt(x1)} ${pt(PH - y1)} m ${pt(x2)} ${pt(PH - y2)} l S\n`; }
+      for (const it of pg.items) c += `q ${pt(it.w)} 0 0 ${pt(it.h)} ${pt(it.x)} ${pt(PH - it.y - it.h)} cm /${names[it.img]} Do Q\n`;
+      const used = [...new Set(pg.items.map(it => it.img))];
+      begin(pid); push(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pt(210)} ${pt(297)}] /Resources << /XObject << ${used.map(k => `/${names[k]} ${imgIds[k]} 0 R`).join(' ')} >> >> /Contents ${cid} 0 R >>\nendobj\n`);
+      const cb = enc.encode(c);
+      begin(cid); push(`<< /Length ${cb.length} >>\nstream\n`); push(cb); push('\nendstream\nendobj\n');
+    });
+    // 標題用 UTF-16BE 十六進位字串
+    const hex = '<FEFF' + [...title].map(ch => ch.charCodeAt(0).toString(16).padStart(4, '0')).join('') + '>';
+    begin(info); push(`<< /Title ${hex} /Producer (Summon builder) >>\nendobj\n`);
+    const xref = len, n = objs.length + 1;
+    push(`xref\n0 ${n}\n0000000000 65535 f \n` + offs.slice(1).map(o => String(o).padStart(10, '0') + ' 00000 n \n').join(''));
+    push(`trailer\n<< /Size ${n} /Root ${catalog} 0 R /Info ${info} 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    return new Blob(parts, { type: 'application/pdf' });
+  }
+  $('#doPdf').onclick = async () => {
+    const btn = $('#doPdf'), label = btn.textContent; btn.disabled = true;
+    try {
+      const ids = printList(), L = layout(), uniq = [...new Set(ids)], images = {};
+      for (let i = 0; i < uniq.length; i++) { btn.textContent = `處理卡圖 ${i + 1}/${uniq.length}`; images[uniq[i]] = await toJpeg(img(uniq[i], true)); }
+      const lines = [];
+      if ($('#pCut').checked) {
+        const len = 5;
+        for (const x of L.xs) lines.push([x, L.y0 - len - 1, x, L.y0 - 1], [x, L.y1 + 1, x, L.y1 + len + 1]);
+        for (const y of L.ys) lines.push([L.x0 - len - 1, y, L.x0 - 1, y], [L.x1 + 1, y, L.x1 + len + 1, y]);
+      }
+      const pages = [];
+      for (let p = 0; p * 9 < ids.length; p++)
+        pages.push({ lines, items: ids.slice(p * 9, p * 9 + 9).map((id, k) => ({ img: id, x: L.pos[k][0], y: L.pos[k][1], w: MM.cw, h: MM.ch })) });
+      const blob = buildPdf(pages, images, `召喚 ${st.name || '自訂牌組'}`);
+      const a = el('a'); a.href = URL.createObjectURL(blob); a.download = `召喚_${(st.name || '牌組').replace(/[\\/:*?"<>|]/g, '')}_A4.pdf`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast('PDF 已下載');
+    } catch (e) { console.error(e); toast('PDF 產生失敗，可改用「列印」→ 另存為 PDF'); }
+    btn.textContent = label; btn.disabled = false;
+  };
+
+  // ---------- 起始：網址帶牌組 > 上次草稿 ----------
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get('deck')) loadDeck({ ...parseDeckCode(h.get('deck')), name: h.get('name') || '' });
+  else { try { const d = JSON.parse(sessionStorage.getItem('summon_builder_draft') || 'null'); if (d) { loadDeck({ cards: d.sel, leader: d.leader, name: d.name }, d.deckIdx); } } catch { } }
+  renderFilters(); refresh();
+})();
+</script>
+</body>
+</html>
