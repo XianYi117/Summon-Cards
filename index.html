@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="召喚 vj.1023 雙人卡牌對戰網頁遊戲">
+<meta name="description" content="召喚 vj.1030 雙人卡牌對戰網頁遊戲">
 <title>召喚 SUMMON</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,7 +37,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .btn.small{padding:7px 14px;font-size:13px}
 
 /* ===== 卡片 ===== */
-.card{position:relative;width:var(--w,96px);aspect-ratio:1064/1478;flex:none;perspective:900px;user-select:none;-webkit-user-select:none}
+.card{position:relative;width:var(--w,96px);aspect-ratio:750/1050;flex:none;perspective:900px;user-select:none;-webkit-user-select:none}
 .card .inner{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.3,.7,.3,1)}
 .card .face,.card .back{position:absolute;inset:0;border-radius:6%;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
 .card .face img{width:100%;height:100%;display:block;object-fit:cover;max-width:none}
@@ -88,6 +88,9 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .info .empty{color:var(--muted);line-height:1.7}
 .lab{font-size:12px;letter-spacing:.2em;color:var(--muted)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
+/* 牌型分組字色：四同屬／三同屬／成對／無牌型 */
+.g4{color:#ff8a78!important;font-weight:700}.g3{color:#f2b05e!important;font-weight:700}.g2{color:#86b6ff!important;font-weight:700}.g1{color:#a3a3a3!important}
+.rolechips{flex-basis:100%;margin-top:2px}.rolechips .chip{font-size:13px;padding:5px 10px}
 .chip{border:1px solid var(--line);background:var(--stone);color:var(--text);padding:9px 12px;border-radius:4px;font-size:14px;display:grid;gap:2px;text-align:left;min-width:86px}
 .chip small{color:var(--muted);font-size:11px}
 .chip[aria-pressed="true"]{border-color:var(--gold-hi);background:#2a2618;box-shadow:0 0 0 1px var(--gold-hi)}
@@ -373,8 +376,9 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
         <button class="btn" id="btnWatch">觀戰戰局</button>
         <button class="btn" id="btnRules">規則說明</button>
         <button class="btn" id="btnGallery">圖鑑一覽</button>
+        <button class="btn" id="btnBuilder" onclick="location.href=SHARED_BASE+'../builder/'">卡牌構築．列印</button>
       </div>
-      <div class="ver">版本 vj.1023.0．隊長 13 位．角色卡 27 種</div>
+      <div class="ver">版本 vj.1030.0．隊長 13 位．角色卡 108 種</div>
     </div>
   </section>
 
@@ -513,7 +517,8 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
   </section>
 </div>
 
-<script src="data.js"></script>
+<script src="shared/data.js"></script>
+<script src="shared/decks.js"></script>
 <script src="engine.js"></script>
 <script src="ui.js"></script>
 
