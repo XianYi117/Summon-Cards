@@ -99,7 +99,7 @@
       const dk = el('div', 'chips decks');
       for (const key of keys) {
         const d = DECKS[key];
-        const sub = d.fixed ? `<small>${d.custom ? '自訂．' : ''}${Object.entries(d.comp).filter(([, v]) => v).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}${d.leader ? `．${LEADERS[d.leader].name}` : ''}</small>` : d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : '<small>27 張隨機 20 張．每屬性最多 8</small>';
+        const sub = d.fixed ? `<small>${d.custom ? '自訂．' : ''}${Object.entries(d.comp).filter(([, v]) => v).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}${d.leader ? `．${LEADERS[d.leader].name}` : ''}</small>` : d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : `<small>全部 ${Object.keys(CARDS).length} 張中隨機 20 張．每屬性最多 ${ATTR_MAX}</small>`;
         const b = el('button', 'chip', `<span>${d.label}</span>${sub}`); b.setAttribute('aria-pressed', s.deck === key);
         b.onclick = () => {
           s.deck = key;
