@@ -656,7 +656,7 @@
         const newS = sm.map(c => ({ uid: c.uid, id: c.id, up: true, sealed: false }));
         p.statues.push(...newS);
         for (const c of cards) { delete c.as; if (!sm.includes(c)) p.disc.push(c); }
-        if (newS.length) this.note(`召喚石像 ${newS.map(s => s.id).join('、')}`, i);
+        if (newS.length) this.note(`【啟動】石像 ${newS.map(s => s.id).join('、')}`, i);
         await this.ui.ev('summon', { i, statues: newS, rest: cards.filter(c => !sm.includes(c)) });
       }
       // 屬性剋制成功時，收回一張至手牌（本回合的出戰牌）
