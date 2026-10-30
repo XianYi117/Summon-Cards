@@ -1,7 +1,10 @@
 // 召喚｜雲端連線（Cloudflare Worker）：共享牌組、對戰紀錄、TURN 中繼
 // 需先載入 data.js、decks.js。CLOUD_API 留空＝不連雲端，一切照舊只存在本機。
 // 網址也可以用 localStorage 'summon_cloud_api' 覆蓋（測試用）。
-const CLOUD_API = '';
+const CLOUD_URL = 'https://summon-cards.dragon89711.workers.dev';
+// 先只在測試版（beta）與構築頁啟用；正式版確認沒問題後把 CLOUD_ONLY_BETA 改成 false
+const CLOUD_ONLY_BETA = true;
+const CLOUD_API = !CLOUD_ONLY_BETA || typeof location === 'undefined' || /\/(beta|builder)\//.test(location.pathname) ? CLOUD_URL : '';
 
 const Cloud = (() => {
   const LS = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { return null; } };

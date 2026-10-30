@@ -4,7 +4,7 @@
 |---|---|
 | `worker.js` | Cloudflare Worker 程式（貼到後台即可） |
 | `schema.sql` | D1 資料表（已在資料庫 `summon-cards` 建好） |
-| `../shared/cloud.js` | 遊戲與構築頁的串接；`CLOUD_API` 填 Worker 網址後啟用，留空＝完全不連雲端 |
+| `../shared/cloud.js` | 遊戲與構築頁的串接；`CLOUD_URL` 是 Worker 網址；`CLOUD_ONLY_BETA` 為 true 時只在測試版與構築頁啟用 |
 | `../tools/cloud_local.mjs` | 本機模擬（Node 內建 sqlite），`node tools/cloud_local.mjs` 開在 8787 埠 |
 
 ## 部署步驟（Cloudflare 後台）
