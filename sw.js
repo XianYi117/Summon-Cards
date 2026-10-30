@@ -2,7 +2,7 @@
 // 只處理 shared/cards/ 的卡圖：先給本機快取（瞬間顯示），同時在背景向伺服器確認有沒有新版，有就更新快取。
 // 換卡圖後，玩家下次進站就會看到新圖；遊戲程式（html、js）不經過這裡，更新一律即時生效。
 // 卡圖大改（例如換一整彈）時，把 VERSION 加 1，舊快取會整個清掉。
-const VERSION = 1;
+const VERSION = 2;
 const CACHE = 'summon-cards-img-v' + VERSION;
 
 self.addEventListener('install', () => self.skipWaiting());
