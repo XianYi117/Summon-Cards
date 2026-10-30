@@ -141,7 +141,7 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
 <body>
 <header>
   <h1>召喚<small>卡牌構築．列印</small></h1>
-  <a class="btn small" href="../beta/">← 回遊戲</a>
+  <a class="btn small" href="../">← 回遊戲</a>
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" data-tab="build" aria-selected="true">構築／總覽</button>
     <button class="tab" role="tab" data-tab="print" aria-selected="false">A4 列印預覽</button>
@@ -325,7 +325,7 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
     renderSide(); persistDraft(); toast(deckProblems(sorted()).length ? '已儲存（張數還不符合規則，遊戲裡暫時不會出現）' : '已儲存，遊戲的牌組選單裡可以選');
     return true;
   }
-  const gameUrl = () => new URL(`../beta/index.html#deck=${deckCode(current())}&name=${encodeURIComponent(current().name)}`, location.href).href;
+  const gameUrl = () => new URL(`../index.html#deck=${deckCode(current())}&name=${encodeURIComponent(current().name)}`, location.href).href;
   const builderUrl = () => new URL(`./#deck=${deckCode(current())}&name=${encodeURIComponent(current().name)}`, location.href).href;
   function dialog(html, onOk) {
     const m = $('#dialog'); m.innerHTML = ''; const d = el('div', 'dlg', html); m.appendChild(d); m.hidden = false;
