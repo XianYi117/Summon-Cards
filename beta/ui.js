@@ -57,6 +57,7 @@
   const leaderIds = Object.keys(LEADERS);
   // 隨機隊長只從這些隊長中挑（L10～L13 調整中，暫不參與隨機；仍可手動選）
   const RANDOM_LEADERS = leaderIds.filter(id => !['L10', 'L11', 'L12', 'L13'].includes(id));
+  let showAllShared = false;
   window.onCloudDecks = () => { if (!$('#pick').hidden) renderPick(); };
   function renderPick() {
     const s = cfg[pickStep], isFoe = pickStep === 'foe';
@@ -94,9 +95,12 @@
     }
     inf.appendChild(el('div', 'lab', '牌組'));
     for (const [tier, title] of [['初階', '初階預組'], ['進階', '進階預組'], ['個人', '個人構築'], ['分享', '玩家分享'], ['其他', '其他']]) {
-      const keys = Object.keys(DECKS).filter(k => (DECKS[k].tier || '其他') === tier);
+      let keys = Object.keys(DECKS).filter(k => (DECKS[k].tier || '其他') === tier);
       if (!keys.length) continue;
-      inf.appendChild(el('div', 'dtier', title));
+      // 玩家分享太多時先收合，只顯示最新 6 副（選中的那副一定顯示）
+      const more = tier === '分享' && keys.length > 6 && !showAllShared;
+      if (more) keys = keys.filter((k, i) => i < 6 || k === s.deck);
+      inf.appendChild(el('div', 'dtier', title + (tier === '分享' ? `<small>．${Object.keys(DECKS).filter(k => DECKS[k].tier === '分享').length} 副</small>` : '')));
       const dk = el('div', 'chips decks');
       for (const key of keys) {
         const d = DECKS[key];
@@ -110,10 +114,14 @@
         };
         dk.appendChild(b);
       }
+      if (more) { const mb = el('button', 'chip', '<span>顯示全部…</span>'); mb.onclick = () => { showAllShared = true; renderPick(); }; dk.appendChild(mb); }
       inf.appendChild(dk);
     }
     if (DECKS[s.deck] && DECKS[s.deck].desc) inf.appendChild(el('div', 'desc', DECKS[s.deck].desc));
-    const bl = el('button', 'btn ghost small', '＋ 卡牌構築（自訂牌組）'); bl.onclick = () => { location.href = SHARED_BASE + '../builder/'; }; bl.style.justifySelf = 'start'; inf.appendChild(bl);
+    const brow = el('div', 'mrow'); brow.style.justifyContent = 'flex-start';
+    const bl = el('button', 'btn ghost small', '＋ 新增牌組'); bl.onclick = () => { location.href = SHARED_BASE + '../builder/#new'; };
+    const bm = el('button', 'btn ghost small', '管理我的牌組（編輯／刪除）'); bm.onclick = () => { location.href = SHARED_BASE + '../builder/#manage'; };
+    brow.append(bl, bm); inf.appendChild(brow);
     const ok = s.leader && s.deck && (s.leader !== 'L11' || s.main);
     const act = el('div', 'pick-actions');
     const next = el('button', 'btn primary', net.on ? (net.myCfg ? '已準備，等待對手…' : '準備完成') : isFoe ? '確認對手' : '下一步'); next.disabled = !ok || (net.on && !!net.myCfg);

@@ -19,7 +19,10 @@ function deckProblems(cards) {
 }
 const DEFAULT_DECK_NAME = '個人牌組';
 // 牌組編號：預組 1～11，個人牌組接在後面，刪除後編號不重用
-function nextDeckNo(list) { return Math.max(0, ...PRESETS.map(p => p.no), ...(list || loadMyDecks()).map(d => d.no || 0)) + 1; }
+function nextDeckNo(list) {
+  const shared = typeof Cloud !== 'undefined' && Cloud.on ? Cloud.cached().map(d => d.no || 0) : []; // 避免和玩家分享的編號撞號（上傳後會改用資料庫發的號）
+  return Math.max(0, ...PRESETS.map(p => p.no), ...(list || loadMyDecks()).map(d => d.no || 0), ...shared) + 1;
+}
 function deckTitle(d) { return d.no ? `${d.no}.${d.name || DEFAULT_DECK_NAME}` : (d.name || DEFAULT_DECK_NAME); }
 function loadMyDecks() {
   let list; try { list = JSON.parse(localStorage.getItem(DECK_STORE) || '[]').filter(d => d && Array.isArray(d.cards)); } catch { return []; }
