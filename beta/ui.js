@@ -225,7 +225,7 @@
 </details>
 <details><summary>隊長</summary>
 <div class="tbl"><table><tr><th>隊長</th><th>屬性．種族</th><th>能力</th></tr>${leaderIds.map(id => { const L = LEADERS[id]; return `<tr><td class="rk">${id} ${L.name}</td><td>${COLOR_NAME[L.color]}．${L.race}</td><td><b>${L.skill}</b>　${L.text}</td></tr>`; }).join('')}</table></div>
-<ul class="rnote"><li>L06「牌型為 AA」：AA、AAB、AABC、AABB 都算，都只 +1。</li><li>L12 專屬戰力：A、AA、AAA、AAAA＝1；AB、AAB、AAAB＝3；AABB＝4；ABC＝5；AABC＝6。對手不能剋制 L12。</li>
+<ul class="rnote"><li>L06「牌型為 AA」：AA、AAB、AABC、AABB 都算，都只 +1。</li><li>L12 專屬戰力：A、AA、AAA、AAAA＝1；AB、AAB、AAAB＝3；AABB＝4；ABC＝5；AABC＝6。L12 的屬性一律看最左一張（不管牌型），可以剋制對手，也會被剋制。</li>
 <li>L13：整理階段，每 2 座自己的同屬性直立石像（還沒在維持封印的）可以封印 1 座對手直立石像；選定後固定，之後只能用新的成對石像追加。維持的 2 座不能獻祭；維持或被封印的石像被破壞就解除；封魔者被封印時暫時失效到判定勝負。同時封印 4 座獲勝。</li></ul>
 </details>
 <details><summary>預組</summary>

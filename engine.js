@@ -365,12 +365,12 @@
       const total = br.reduce((a, b) => a + b[1], 0);
       return withBreak ? { total, br } : total;
     }
-    // 剋制：每回合都判定（不限牌型）；不受剋制、L12 不會被剋
+    // 剋制：每回合都判定（不限牌型）；有「不受剋制」時不會被剋
     counterAdv(ctx) {
       const adv = [false, false];
       for (const i of [0, 1]) {
         const o = this.opp(i), j = 1 - i;
-        const oImm = ctx.immune[j] || this.lead(o, 'L12');
+        const oImm = ctx.immune[j];
         if (ctx.core[i] && ctx.core[j] && BEATS[ctx.core[i]] === ctx.core[j] && !oImm) adv[i] = true;
       }
       return adv;
@@ -776,7 +776,7 @@
     },
     // a 剋 b 時 a 多出的戰力
     clash(g, a, b) {
-      if (!a.core || !b.core || BEATS[a.core] !== b.core || b.imm || b.l12) return 0;
+      if (!a.core || !b.core || BEATS[a.core] !== b.core || b.imm) return 0;
       const pa = g.p[a.i], pb = g.p[b.i];
       return 2 + 2 * g.fx(pa, 'cPlus2') + ((g.ctx && g.ctx.cbonus) ? g.ctx.cbonus[a.i] : 0) - g.fx(pb, 'cPunish');
     },
