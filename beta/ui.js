@@ -34,7 +34,7 @@
   }
 
   // ---------- 畫面切換 ----------
-  const screens = ['home', 'pick', 'vs', 'battle', 'rules', 'gallery', 'online', 'watchScr'];
+  const screens = ['home', 'pick', 'vs', 'battle', 'rules', 'gallery', 'online', 'watchScr', 'build'];
   function show(id) { screens.forEach(s => $('#' + s).hidden = s !== id); if (id === 'battle') fitStage(); }
   document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('home'));
 
@@ -53,6 +53,27 @@
   })();
 
   // ---------- 選角 ----------
+  // ---------- 牌組：預組＋個人構築（目前存在瀏覽器；之後改接資料庫，介面不變） ----------
+  const DeckStore = {
+    key: 'summon.decks.v1',
+    list() { try { return JSON.parse(localStorage.getItem(this.key)) || []; } catch { return []; } },
+    write(arr) { try { localStorage.setItem(this.key, JSON.stringify(arr)); return true; } catch { return false; } },
+    nextNo() { return Math.max(0, ...PRESETS.map(p => p.no), ...this.list().map(d => d.no)) + 1; },
+    save(d) { const arr = this.list().filter(x => x.no !== d.no); arr.push(d); arr.sort((a, b) => a.no - b.no); return this.write(arr); },
+    remove(no) { return this.write(this.list().filter(x => x.no !== no)); },
+  };
+  const DEFAULT_NAME = '個人牌組';
+  const deckTitle = d => d.key === 'RND' ? '隨機牌組' : `${d.no}.${d.name}`;
+  function allDecks() {
+    return [...PRESETS.map(p => ({ ...p, key: 'P' + p.no })),
+      ...DeckStore.list().map(d => ({ ...d, tier: '個人', key: 'C' + d.no })),
+      { key: 'RND', tier: '隨機', name: '隨機', desc: '從全部卡中隨機抽 20 張，每屬性最多 8 張' }];
+  }
+  const deckByKey = key => allDecks().find(d => d.key === key);
+  const colorCount = ids => { const c = { F: 0, W: 0, G: 0 }; ids.forEach(id => c[id[0]]++); return c; };
+  const countText = ids => { const c = colorCount(ids); return ['F', 'W', 'G'].filter(k => c[k]).map(k => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${c[k]}`).join(' '); };
+  const deckLabel = s => s.deckName || (deckByKey(s.deckType || s.deck) ? deckTitle(deckByKey(s.deckType || s.deck)) : '自訂牌組');
+
   let cfg = { me: {}, foe: {} }, pickStep = 'me';
   const leaderIds = Object.keys(LEADERS);
   // 隨機隊長只從這些隊長中挑（L10～L13 調整中，暫不參與隨機；仍可手動選）
@@ -92,15 +113,42 @@
       }
     }
     inf.appendChild(el('div', 'lab', '牌組'));
-    const dk = el('div', 'chips');
-    for (const key of Object.keys(DECKS)) {
-      const d = DECKS[key];
-      const sub = d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : '<small>27 張隨機 20 張．每屬性最多 8</small>';
-      const b = el('button', 'chip', `<span>${d.label}</span>${sub}`); b.setAttribute('aria-pressed', s.deck === key);
-      b.onclick = () => { s.deck = key; if (s.leader === 'L11' && !s.mainTouched && d.comp) s.main = Object.keys(d.comp)[0]; renderPick(); };
-      dk.appendChild(b);
+    const decks = allDecks();
+    for (const tier of ['初階', '進階', '個人', '隨機']) {
+      const list = decks.filter(d => d.tier === tier);
+      if (tier !== '個人' && !list.length) continue;
+      inf.appendChild(el('div', 'dtier', tier === '個人' ? '個人構築' : tier === '隨機' ? '其他' : tier + '預組'));
+      const dk = el('div', 'chips decks');
+      for (const d of list) {
+        const sub = d.key === 'RND' ? '<small>全部卡隨機 20 張</small>' : `<small>${countText(d.cards)}</small>`;
+        const b = el('button', 'chip', `<span>${deckTitle(d)}</span>${sub}`); b.setAttribute('aria-pressed', s.deck === d.key);
+        if (d.desc) b.title = d.desc;
+        b.onclick = () => {
+          s.deck = d.key; delete s.deckName;
+          if (s.leader === 'L11' && !s.mainTouched && d.cards) { const c = colorCount(d.cards); s.main = Object.keys(c).sort((x, y) => c[y] - c[x])[0]; }
+          renderPick();
+        };
+        dk.appendChild(b);
+      }
+      if (tier === '個人') {
+        const nb = el('button', 'chip newdeck', '<span>＋ 建立新牌組</span><small>選 20 張並命名</small>');
+        nb.onclick = () => openBuilder(null, 'pick'); dk.appendChild(nb);
+      }
+      inf.appendChild(dk);
     }
-    inf.appendChild(dk);
+    const cur = deckByKey(s.deck);
+    if (cur) {
+      inf.appendChild(el('div', 'desc', cur.desc || ''));
+      const row = el('div', 'mrow deckops');
+      if (cur.cards) { const v = el('button', 'btn ghost small', '查看牌組'); v.onclick = () => openDeckView(cur.cards, deckTitle(cur)); row.appendChild(v); }
+      if (cur.tier === '個人') {
+        const e = el('button', 'btn ghost small', '編輯'); e.onclick = () => openBuilder(cur, 'pick');
+        const x = el('button', 'btn ghost small danger', '刪除');
+        x.onclick = () => { if (x.dataset.sure) { DeckStore.remove(cur.no); delete s.deck; renderPick(); } else { x.dataset.sure = 1; x.textContent = '確定刪除？'; } };
+        row.append(e, x);
+      }
+      inf.appendChild(row);
+    }
     const ok = s.leader && s.deck && (s.leader !== 'L11' || s.main);
     const act = el('div', 'pick-actions');
     const next = el('button', 'btn primary', net.on ? (net.myCfg ? '已準備，等待對手…' : '準備完成') : isFoe ? '確認對手' : '下一步'); next.disabled = !ok || (net.on && !!net.myCfg);
@@ -111,21 +159,16 @@
   }
   $('#pickBack').onclick = () => { if (net.on) { if (net.conn) net.send({ k: 'bye' }); net.close(); show('home'); return; } if (pickStep === 'foe') { pickStep = 'me'; renderPick(); } else show('home'); };
   // 依牌組類型抽出 20 張（每色張數照設定，色內隨機）
-  function rollDeck(type) {
-    const comp = (DECKS[type] || DECKS.RND).comp;
-    if (!comp) return randomDeckIds();
-    const out = [];
-    for (const col of ['F', 'W', 'G']) {
-      const ids = Object.keys(CARDS).filter(id => id[0] === col).sort(() => Math.random() - .5);
-      out.push(...ids.slice(0, comp[col]).sort());
-    }
-    return out;
+  function rollDeck(key) {
+    const d = deckByKey(key);
+    return d && d.cards ? d.cards.slice() : randomDeckIds();
   }
   function resolveSide(s) {
     s.realLeader = s.leader === 'RANDOM' ? RANDOM_LEADERS[Math.floor(Math.random() * RANDOM_LEADERS.length)] : s.leader;
     if (s.realLeader !== 'L11') delete s.main;
     else if (!s.main) s.main = ['F', 'W', 'G'][Math.floor(Math.random() * 3)];
     s.cards = rollDeck(s.deck);
+    const d = deckByKey(s.deck); s.deckName = d ? deckTitle(d) : '隨機牌組';
   }
   function finalizeCfg() { resolveSide(cfg.me); resolveSide(cfg.foe); }
   // 查看牌組：依屬性列出 20 張
@@ -151,15 +194,81 @@
       const id = s.realLeader || s.leader;
       const c = cardEl(id, { hi: true }); tilt(c, 10); box.appendChild(c);
       box.appendChild(el('div', 'nm', `${who}．${LEADERS[id].name}`));
-      box.appendChild(el('div', 'dk', `牌組：${DECKS[s.deckType || s.deck].label}${s.main ? `．宣告主色 <span class="ctag ${s.main}">${COLOR_NAME[s.main]}</span>` : ''}${s.leader === 'RANDOM' || s.randLeader ? '．隨機隊長' : ''}`));
+      box.appendChild(el('div', 'dk', `牌組：${deckLabel(s)}${s.main ? `．宣告主色 <span class="ctag ${s.main}">${COLOR_NAME[s.main]}</span>` : ''}${s.leader === 'RANDOM' || s.randLeader ? '．隨機隊長' : ''}`));
     };
     side($('#vsFoe'), cfg.foe, '對手'); side($('#vsMe'), cfg.me, '我方');
-    $('#vsReroll').hidden = net.on;
+    refreshReroll();
   }
   $('#vsBack').onclick = () => { pickStep = 'me'; renderPick(); show('pick'); };
   $('#vsStart').onclick = () => startBattle();
   $('#vsDeck').onclick = () => openDeckView(cfg.me.cards || [], '我方牌組');
   $('#vsReroll').onclick = () => { cfg.me.cards = rollDeck(cfg.me.deck); openDeckView(cfg.me.cards, '我方牌組（重新抽過）'); };
+  const refreshReroll = () => { $('#vsReroll').hidden = net.on || cfg.me.deck !== 'RND'; };
+
+  // ---------- 個人構築 ----------
+  const B = { deck: null, cards: [], col: 'all', role: 'all', back: 'home' };
+  function openBuilder(d, back) {
+    B.deck = d; B.cards = d ? d.cards.slice() : []; B.back = back || 'home'; B.col = 'all'; B.role = 'all';
+    $('#bTitle').textContent = d ? `編輯：${deckTitle(d)}` : '建立新牌組';
+    $('#bName').value = d && d.name !== DEFAULT_NAME ? d.name : '';
+    $('#bName').placeholder = `${d ? d.no : DeckStore.nextNo()}.${DEFAULT_NAME}`;
+    $('#bMsg').textContent = '';
+    renderBuilder(); show('build'); window.scrollTo(0, 0);
+  }
+  function renderBuilder() {
+    const fc = $('#bCol'); fc.innerHTML = '';
+    for (const [k, lab] of [['all', '全部'], ['F', '火'], ['W', '水'], ['G', '草']]) { const b = el('button', 'chip', lab); b.setAttribute('aria-pressed', B.col === k); b.onclick = () => { B.col = k; renderBuilder(); }; fc.appendChild(b); }
+    const fr = $('#bRole'); fr.innerHTML = '';
+    for (const k of ['all', ...ROLES]) { const b = el('button', 'chip small', k === 'all' ? '全部定位' : k); b.setAttribute('aria-pressed', B.role === k); b.onclick = () => { B.role = k; renderBuilder(); }; fr.appendChild(b); }
+    const cnt = colorCount(B.cards);
+    const pool = $('#bPool'); pool.innerHTML = '';
+    for (const id of Object.keys(CARDS).filter(id => (B.col === 'all' || id[0] === B.col) && (B.role === 'all' || CARDS[id].roles.includes(B.role)))) {
+      const d = CARDS[id], on = B.cards.includes(id);
+      const full = !on && (B.cards.length >= 20 || cnt[id[0]] >= ATTR_MAX);
+      const row = el('button', 'dvcard brow ' + id[0] + (on ? ' on' : '') + (full ? ' full' : ''));
+      row.appendChild(cardEl(id));
+      row.appendChild(el('div', 'dvtx', `<b>${id} ${d.name}${on ? '<em>已放入</em>' : ''}</b><span><i>啟動</i>${d.act}</span><span><i>獻祭</i>${d.sac}</span><span class="roles">${d.roles.join('．')}</span>`));
+      row.disabled = full;
+      row.onclick = () => { if (on) B.cards.splice(B.cards.indexOf(id), 1); else if (!full) B.cards.push(id); $('#bMsg').textContent = ''; renderBuilder(); };
+      pool.appendChild(row);
+    }
+    $('#bCount').innerHTML = `<b class="${B.cards.length === 20 ? 'ok' : ''}">${B.cards.length}／20 張</b>` +
+      ['F', 'W', 'G'].map(k => `<span class="${cnt[k] >= ATTR_MAX ? 'max' : ''}"><span class="dot ${k}"></span>${COLOR_NAME[k]} ${cnt[k]}／${ATTR_MAX}</span>`).join('');
+    const list = $('#bList'); list.innerHTML = '';
+    if (!B.cards.length) list.appendChild(el('div', 'empty', '點左邊的卡放進牌組，再點一次拿掉。'));
+    for (const id of B.cards.slice().sort()) {
+      const r = el('button', 'bitem ' + id[0], `<span>${id} ${CARDS[id].name}</span><i>×</i>`); r.title = `${CARDS[id].act}／${CARDS[id].sac}`;
+      r.onclick = () => { B.cards.splice(B.cards.indexOf(id), 1); renderBuilder(); }; list.appendChild(r);
+    }
+    $('#bSave').disabled = B.cards.length !== 20;
+    renderMyDecks();
+  }
+  function renderMyDecks() {
+    const box = $('#bMine'); box.innerHTML = '';
+    const mine = DeckStore.list();
+    box.appendChild(el('div', 'lab', `我的牌組（${mine.length}）`));
+    if (!mine.length) { box.appendChild(el('div', 'empty', '還沒有個人牌組。')); return; }
+    for (const d of mine) {
+      const r = el('div', 'mine' + (B.deck && B.deck.no === d.no ? ' cur' : ''));
+      r.appendChild(el('span', '', `<b>${d.no}.${d.name}</b><small>${countText(d.cards)}</small>`));
+      const e = el('button', 'btn ghost small', '編輯'); e.onclick = () => openBuilder({ ...d, tier: '個人', key: 'C' + d.no }, B.back);
+      const x = el('button', 'btn ghost small danger', '刪除');
+      x.onclick = () => { if (!x.dataset.sure) { x.dataset.sure = 1; x.textContent = '確定刪除？'; return; } DeckStore.remove(d.no); if (B.deck && B.deck.no === d.no) openBuilder(null, B.back); else renderMyDecks(); };
+      r.append(e, x); box.appendChild(r);
+    }
+  }
+  $('#bClear').onclick = () => { B.cards = []; renderBuilder(); };
+  $('#bSave').onclick = () => {
+    if (B.cards.length !== 20) return;
+    const no = B.deck ? B.deck.no : DeckStore.nextNo();
+    const name = $('#bName').value.trim().replace(/^\d+\s*[.．、]\s*/, '') || DEFAULT_NAME;
+    const d = { no, name, cards: B.cards.slice().sort(), updated: Date.now(), created: B.deck && B.deck.created || Date.now() };
+    if (!DeckStore.save(d)) { $('#bMsg').textContent = '儲存失敗：瀏覽器不允許儲存資料（可能是無痕模式）。'; return; }
+    if (B.back === 'pick') { cfg[pickStep].deck = 'C' + no; delete cfg[pickStep].deckName; renderPick(); show('pick'); return; }
+    openBuilder({ ...d, tier: '個人', key: 'C' + no }, B.back); $('#bMsg').textContent = `已儲存：${no}.${name}`;
+  };
+  $('#bBack').onclick = () => { if (B.back === 'pick') { renderPick(); show('pick'); } else show('home'); };
+  $('#btnBuild').onclick = () => openBuilder(null, 'home');
 
   // ---------- 規則 ----------
   const grpOf = n => /^AAAA/.test(n) ? 'g4' : /^AAA/.test(n) ? 'g3' : /^A、AB|無牌型/.test(n) ? 'g1' : 'g2';
@@ -919,7 +1028,7 @@
     toPick() { this.myCfg = null; cfg = { me: {}, foe: {} }; pickStep = 'me'; renderPick(); show('pick'); renderNetPick(); },
     ready() {
       const s = cfg.me; resolveSide(s);
-      this.myCfg = { leader: s.realLeader, deck: s.cards, deckType: s.deck, main: s.realLeader === 'L11' ? s.main : undefined, randLeader: s.leader === 'RANDOM' };
+      this.myCfg = { leader: s.realLeader, deck: s.cards, deckType: s.deck, deckName: s.deckName, main: s.realLeader === 'L11' ? s.main : undefined, randLeader: s.leader === 'RANDOM' };
       this.send({ k: 'cfg', cfg: this.myCfg }); renderNetPick();
       if (this.host) this.tryStart();
     },
