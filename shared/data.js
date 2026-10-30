@@ -127,7 +127,7 @@ const LEADERS = {
   L09: { name: '豐饒掌管者', color: 'N', race: '仙', skill: '餘裕之手', text: '【補牌】補至 6 張' },
   L10: { name: '三界召喚師', color: 'N', race: '靈', skill: '三界契約', text: '直立石像 7 座，且火水草各至少 2 座：獲勝' },
   L11: { name: '冥火貓妖', color: 'N', race: '獸', skill: '主色號令', text: '選主色；主色石像 2 座：戰力 +2；4 座：獲勝' },
-  L12: { name: '幻術蠱王', color: 'N', race: '蟲', skill: '變色之術', text: '雜色越強（ABC 5、AABC 6）；最左張決定屬性，剋制不限牌型、不會被剋；無牌型時【啟動】最左 1 張' },
+  L12: { name: '幻術蠱王', color: 'N', race: '蟲', skill: '變色之術', text: '雜色越強（ABC 5、AABC 6）；最左張決定屬性、不會被剋；無牌型時【啟動】最左 1 張' },
   L13: { name: '封魔者', color: 'N', race: '人', skill: '雙界封印', text: '整理時：每 2 座同屬性直立石像封印對手 1 座（選定後固定）；封印 4 座：獲勝' },
 };
 for (const id in LEADERS) LEADERS[id].id = id;
