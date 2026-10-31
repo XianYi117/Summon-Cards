@@ -628,9 +628,9 @@
         renderAll(); await wait(d.i === ME ? 380 : 120); break;
       case 'discard': case 'retrieve': renderAll(); await wait(300); break;
       case 'peek':
-        if (spectating) await banner(`${who(d.i)}查看了對手 2 張手牌`, 700);
-        else if (d.i === ME) await modalCards('對手的手牌（隨機 2 張）', d.cards, { view: true });
-        else await banner('對手查看了你 2 張手牌', 900);
+        if (spectating) await banner(`${who(d.i)}查看了對手 ${d.cards.length} 張手牌`, 700);
+        else if (d.i === ME) await modalCards(`對手的手牌（隨機 ${d.cards.length} 張${d.src ? '．' + d.src : ''}${d.want > d.cards.length ? `．對手只有 ${d.cards.length} 張` : ''}）`, d.cards, { view: true });
+        else await banner(`對手查看了你 ${d.cards.length} 張手牌`, 900);
         break;
       case 'seal': renderAll(); await wait(450); break;
       case 'unseal': renderAll(); break;

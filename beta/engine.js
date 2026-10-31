@@ -233,7 +233,10 @@
       // 出牌前：看對手手牌（L07、【出牌】前：看對手 2 張手牌）
       for (const i of order) {
         const p = this.p[i], o = this.opp(i);
-        if ((this.lead(p, 'L07') || this.fx(p, 'peekHand')) && o.hand.length) await this.peek(i, 2);
+        // 每個來源各看 2 張，可以疊加（L07＋1 座火狐＝4 張）
+        const k = this.fx(p, 'peekHand'), src = [this.lead(p, 'L07') ? '暗中窺探' : '', k ? `火狐石像${k > 1 ? '×' + k : ''}` : ''].filter(Boolean);
+        const n = 2 * ((this.lead(p, 'L07') ? 1 : 0) + k);
+        if (n && o.hand.length) await this.peek(i, n, src.join('＋'));
       }
       this.checkAlt();
     }
@@ -282,11 +285,12 @@
         await this.ui.ev('seal', { i });
       }
     }
-    async peek(i, n) {
+    async peek(i, n, src) {
       const o = this.opp(i);
       const cards = shuffle(o.hand.slice()).slice(0, n);
-      this.p[i].peeked = cards; // 電腦 AI 出牌時會用到看過的牌
-      await this.ui.ev('peek', { i, cards });
+      this.note(`${src ? src + '：' : ''}看對手 ${cards.length} 張手牌${cards.length < n ? `（對手只有 ${cards.length} 張）` : ''}`, i);
+      this.p[i].peeked = [...new Set([...(this.p[i].peeked || []), ...cards])]; // 電腦 AI 出牌時會用到看過的牌（同回合看過的都記得）
+      await this.ui.ev('peek', { i, cards, src, want: n });
     }
 
     // ---------- 鎖定出牌與「翻牌前看對手出戰牌」 ----------
@@ -447,7 +451,7 @@
     async resolve(i, key, phase, src) {
       const p = this.p[i], o = this.opp(i), j = 1 - i, ctx = this.ctx;
       switch (key) {
-        case 'peek2': if (o.hand.length) await this.peek(i, 2); break;
+        case 'peek2': if (o.hand.length) await this.peek(i, 2, '獻祭'); break;
         case 'immune': ctx.immune[i] = true; break;
         case 'tutor': {
           if (!p.deck.length) break;
