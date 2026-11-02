@@ -91,7 +91,7 @@ const CARDS = {
   G26: {"name": "草鹿", "race": "鹿", "act": "核心為草：戰力 +1", "sac": "本回合不受屬性剋制", "role": "同色石像、剋屬", "fa": "coreG", "fs": "immune"},
   G27: {"name": "草花", "race": "花", "act": "核心為草：戰力 +1", "sac": "本回合對手戰力 -2", "role": "同色石像、循環續航", "fa": "coreG", "fs": "oppMinus2"},
   G28: {"name": "草蟲", "race": "蟲", "act": "出戰牌全同屬性：戰力 +2", "sac": "翻牌前看對手 2 張出戰牌", "role": "牌型、循環續航", "fa": "mono2", "fs": "peekPlay2"},
-  G29: {"name": "草精", "race": "精", "act": "【回合結束】：我方已獻祭石像 1 座重新直立", "sac": "手牌 1 張啟動為石像", "role": "獻祭、同色石像", "fa": "endUpright", "fs": "handStatue"},
+  G29: {"name": "草精", "race": "精", "act": "【回合結束】：我方已獻祭石像 1 座放入棄牌區", "sac": "手牌 1 張啟動為石像", "role": "獻祭、同色石像", "fa": "endSacDisc", "fs": "handStatue"},
   G30: {"name": "草精", "race": "精", "act": "【對方】本回合有獻祭石像：對手戰力 -1", "sac": "本回合【啟動】石像時，多啟動 1 張", "role": "干擾控制、獻祭", "fa": "oppSacced1", "fs": "extraSummon"},
 };
 for (const id in CARDS) { CARDS[id].id = id; CARDS[id].color = id[0]; CARDS[id].roles = CARDS[id].role.split('、'); }
@@ -152,7 +152,7 @@ function randomDeckIds(rand = Math.random) {
 // 卡圖放在 shared/cards/（原圖 600px）與 shared/cards/sm/（小圖 300px）。
 // 路徑以這支 data.js 的位置為準，所以 beta/、builder/ 或之後新增的頁面都能共用同一份卡圖。
 const SHARED_BASE = (document.currentScript && document.currentScript.src || location.href).replace(/[^/]*$/, '');
-const IMG_VER = '1102b'; // 換卡圖時改這個，瀏覽器和快取就會抓新圖
+const IMG_VER = '1102c'; // 換卡圖時改這個，瀏覽器和快取就會抓新圖
 const img = (id, hi) => hi ? `${SHARED_BASE}cards/${id}.webp?v=${IMG_VER}` : `${SHARED_BASE}cards/sm/${id}.webp?v=${IMG_VER}`;
 // 只預載「這一場用得到」的卡（雙方牌組＋隊長），卡池再大，載入量也不會跟著變大
 const IMG_CACHE = new Map();
