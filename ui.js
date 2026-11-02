@@ -237,7 +237,7 @@
   function renderRules() {
     const pw = [['AAAA', '火火火火', 7, '1 張'], ['AAAB', '火火火水', 6, '1 張'], ['AAA', '火火火', 5, '1 張'], ['AABB', '火火水水', 4, '2 張'], ['AAB、AABC', '火火水、火火水草', 3, '1 張'], ['AA', '火火', 2, '1 張'], ['無牌型（雜色）', '火、火水、火水草', 1, '不能']];
     const words = [['【補牌】', '回合開始的補牌階段。寫「【補牌】：」的效果在補到 5 張後觸發；被「對手抽牌 -1」減少時，手牌最少補到 4 張。'], ['【出牌】前', '雙方選牌之前。'], ['【翻牌】前', '雙方翻開出戰牌之前。'],
-      ['【回合結束】', '回合最後一步，場上其餘卡牌進棄牌區之前。'], ['【多抽】', '補滿 5 張以外，額外從牌庫抽牌；不受 5 張限制。'], ['【換牌】', '棄 1 張手牌，再抽 1 張。'],
+      ['【回合結束】', '回合最後一步，場上其餘卡牌進棄牌區之前。'], ['【多抽】', '補滿 5 張以外，額外從牌庫抽牌；不受 5 張限制。'], ['【換牌】', '可以選擇棄 1 張手牌，再抽 1 張；也可以不換。'],
       ['【反擊】', '在對手獻祭時回應，讓對手這次獻祭無效。'], ['【啟動】石像', '回合流程第 5 步：把成對那組最左邊的出戰牌變成石像。和石像直立時的「啟動效果」不同。'], ['【我方】／【對方】／【雙方】', '效果觸發的對象範圍。'], ['直立石像', '直放、未獻祭的石像；啟動效果有效。'],
       ['已獻祭石像', '橫放的石像，沒有任何技能。被對手效果打成橫放的也算（但不算對方獻祭）。'], ['出戰牌', '本回合翻開比戰力的牌。'], ['牌型有 AA', 'AA、AAB、AABC、AABB。'], ['牌型有 AAA', 'AAA、AAAB。'], ['雜色', 'AB、ABC。'],
       ['剋制加成', '剋制成功時的戰力加成，基本 +2。'], ['取回', '從棄牌區選牌加入手牌。'], ['牌庫頂／牌庫底', '牌庫最上面／最下面。'], ['本回合', '到這回合【回合結束】為止；一次性封印例外。'], ['破壞', '石像離場進擁有者的棄牌區。「石像被破壞時：本回合戰力 +1」只在戰力計算前被破壞才有作用。'], ['多啟動 1 張', '從還沒變成石像的出戰牌中，自己選 1 張也變成石像，不看牌型、不限位置。'], ['發動場上石像的獻祭效果', '雙方的直立、未封印石像都可以選（維持 L13 封印的除外），效果由我方獲得，不能選【反擊】。'], ['雙方棄掉全部手牌重抽', '雙方各自棄掉手牌，再抽回相同張數；不算補牌，不受「抽牌 -1」影響。'], ['（每回合執行一次）', '同一回合內最多觸發 1 次。']];
@@ -927,8 +927,8 @@
       switch (kind) {
         case 'retrieve': return modalCards(`取回：從棄牌區選 ${o.n} 張`, o.cards, { n: o.n });
         case 'tutor': return modalCards(o.title, o.cards, { n: 1 });
-        case 'discardOne': return modalCards(o.title, o.cards, { n: 1 });
-        case 'swap': case 'handBottom': case 'discBottom': return modalCards(o.title, o.cards, { n: 1 });
+        case 'discardOne': case 'swap': return modalCards(o.title, o.cards, { n: 1, okText: '換這張', skipText: '不換', optional: true });
+        case 'handBottom': case 'discBottom': return modalCards(o.title, o.cards, { n: 1 });
         case 'scry': return modalCards(o.title, o.cards, { n: o.n, upTo: true, okText: '放到牌庫底', skipText: '都留在牌庫頂', optional: true });
         case 'color': return modalColor(o.title, o.cards);
         case 'statue': { const s = await boardPick(o.statues, o.title + '：點選場上發光的石像'); return s ? [s] : []; }

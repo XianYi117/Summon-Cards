@@ -235,7 +235,7 @@
         if (k) { this.note(`【補牌】【多抽】${k} 張`, i); await this.extraDraw(i, k); }
         for (let n = this.fx(p, 'drawSwap'); n > 0; n--) {
           if (!p.hand.length) break;
-          const [c] = await this.ctrl[i].pick(this, i, 'discardOne', { cards: p.hand.slice(), n: 1, title: '【換牌】：棄 1 張手牌，再抽 1 張' });
+          const [c] = await this.ctrl[i].pick(this, i, 'discardOne', { cards: p.hand.slice(), n: 1, title: '【換牌】：棄 1 張手牌，再抽 1 張（也可以不換）' });
           if (!c || !p.hand.includes(c)) break;
           p.hand.splice(p.hand.indexOf(c), 1); p.disc.push(c); await this.ui.ev('discard', { i, cards: [c] });
           await this.draw(i, 1);
@@ -526,7 +526,7 @@
         case 'swapTop': {
           this.refill(p);
           if (p.hand.length && p.deck.length) {
-            const [c] = (await this.ctrl[i].pick(this, i, 'swap', { cards: p.hand.slice(), n: 1, title: '選 1 張手牌與牌庫頂交換' })) || [];
+            const [c] = (await this.ctrl[i].pick(this, i, 'swap', { cards: p.hand.slice(), n: 1, title: '選 1 張手牌與牌庫頂交換（也可以不換）' })) || [];
             if (c && p.hand.includes(c)) { p.hand.splice(p.hand.indexOf(c), 1); const top = p.deck.pop(); p.deck.push(c); p.hand.push(top); await this.ui.ev('draw', { i, cards: [top] }); }
           }
           break;
