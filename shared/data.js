@@ -19,7 +19,7 @@ const CARDS = {
   F14: {"name": "火狐", "race": "狐", "act": "【補牌】：【換牌】1 張（棄 1 張手牌，再抽 1 張）", "sac": "棄牌區 2 張洗回牌庫", "role": "循環續航", "fa": "drawSwap", "fs": "discBack2"},
   F15: {"name": "火龍", "race": "龍", "act": "【補牌】：從棄牌區隨機取回 1 張", "sac": "本回合對手不能獻祭（可被【反擊】回應）", "role": "循環續航、干擾控制", "fa": "drawRetrieve", "fs": "block"},
   F16: {"name": "火鬼", "race": "鬼", "act": "【我方】獻祭石像時：【多抽】 1 張", "sac": "翻牌前看對手 2 張出戰牌", "role": "獻祭、剋屬", "fa": "onMySac", "fs": "peekPlay2"},
-  F17: {"name": "火龍", "race": "龍", "act": "【回合結束】：我方已獻祭石像 1 座洗回牌庫", "sac": "從棄牌區取回 2 張", "role": "獻祭、循環續航", "fa": "endSacBack", "fs": "retrieve2"},
+  F17: {"name": "火龍", "race": "龍", "act": "【對方】本回合有獻祭石像：對手戰力 -1", "sac": "從棄牌區取回 2 張", "role": "獻祭、循環續航", "fa": "oppSacced1", "fs": "retrieve2"},
   F18: {"name": "火獸", "race": "獸", "act": "我方每 2 座直立火石像：戰力 +1", "sac": "變換 1 張手牌或出戰牌的屬性（本回合有效）", "role": "同色石像、剋屬", "fa": "stF", "fs": "recolor"},
   F19: {"name": "火龍", "race": "龍", "act": "【我方】本回合破壞對手石像：戰力 +1", "sac": "本回合我方剋制加成 +2", "role": "破壞、剋屬", "fa": "destroyed1", "fs": "counterPlus2"},
   F20: {"name": "火獸", "race": "獸", "act": "【我方】本回合破壞對手石像：戰力 +1", "sac": "變換 1 張手牌或出戰牌的屬性（本回合有效）", "role": "破壞、剋屬", "fa": "destroyed1", "fs": "recolor"},
@@ -71,9 +71,9 @@ const CARDS = {
   G06: {"name": "草樹", "race": "樹", "act": "【補牌】：對手抽牌 -1（每回合執行一次）", "sac": "【雙方】各 1 座已獻祭石像放入棄牌區", "role": "干擾控制", "fa": "drawCut", "fs": "bothSacToDisc"},
   G07: {"name": "草精", "race": "精", "act": "【對方】本回合有獻祭石像：對手戰力 -1", "sac": "【對方】1 座直立石像橫放（不發動效果）", "role": "干擾控制、獻祭", "fa": "oppSacced1", "fs": "knockDown"},
   G08: {"name": "草樹", "race": "樹", "act": "【對方】獻祭石像時：我方【多抽】 1 張", "sac": "本回合對手不能獻祭（可被【反擊】回應）", "role": "干擾控制", "fa": "onOppSac", "fs": "block"},
-  G09: {"name": "草花", "race": "花", "act": "【回合結束】：棄牌區 1 張放回牌庫底", "sac": "【多抽】 2 張", "role": "循環續航", "fa": "endDiscBottom", "fs": "draw2"},
+  G09: {"name": "草花", "race": "花", "act": "【回合結束】：棄牌區 1 張放回牌庫底並洗勻", "sac": "【多抽】 2 張", "role": "循環續航", "fa": "endDiscBottom", "fs": "draw2"},
   G10: {"name": "草蟲", "race": "蟲", "act": "【補牌】：【多抽】 1 張", "sac": "破壞對手 1 座直立石像（放入對手棄牌區）", "role": "循環續航、破壞", "fa": "drawPlus1", "fs": "destroy"},
-  G11: {"name": "草鹿", "race": "鹿", "act": "【回合結束】：我方已獻祭石像 1 座放入棄牌區", "sac": "【多抽】 2 張", "role": "獻祭、同色石像", "fa": "endSacDisc", "fs": "draw2"},
+  G11: {"name": "草鹿", "race": "鹿", "act": "【回合結束】：棄牌區 1 張放回牌庫底", "sac": "【多抽】 2 張", "role": "獻祭、同色石像", "fa": "endDiscBottom", "fs": "draw2"},
   G12: {"name": "草仙", "race": "仙", "act": "【我方】獻祭石像時：【多抽】 1 張", "sac": "從棄牌區取回 2 張", "role": "獻祭、循環續航", "fa": "onMySac", "fs": "retrieve2"},
   G13: {"name": "草仙", "race": "仙", "act": "【回合結束】：我方已獻祭石像 1 座洗回牌庫", "sac": "本回合我方剋制加成 +2", "role": "獻祭、循環續航", "fa": "endSacBack", "fs": "counterPlus2"},
   G14: {"name": "草蟲", "race": "蟲", "act": "牌型有 AA：戰力 +1", "sac": "變換 1 張手牌或出戰牌的屬性（本回合有效）", "role": "牌型、對子雜色、剋屬", "fa": "pair1", "fs": "recolor"},
@@ -152,7 +152,7 @@ function randomDeckIds(rand = Math.random) {
 // 卡圖放在 shared/cards/（原圖 600px）與 shared/cards/sm/（小圖 300px）。
 // 路徑以這支 data.js 的位置為準，所以 beta/、builder/ 或之後新增的頁面都能共用同一份卡圖。
 const SHARED_BASE = (document.currentScript && document.currentScript.src || location.href).replace(/[^/]*$/, '');
-const IMG_VER = '1102f'; // 換卡圖時改這個，瀏覽器和快取就會抓新圖
+const IMG_VER = '1102h'; // 換卡圖時改這個，瀏覽器和快取就會抓新圖
 const img = (id, hi) => hi ? `${SHARED_BASE}cards/${id}.webp?v=${IMG_VER}` : `${SHARED_BASE}cards/sm/${id}.webp?v=${IMG_VER}`;
 // 只預載「這一場用得到」的卡（雙方牌組＋隊長），卡池再大，載入量也不會跟著變大
 const IMG_CACHE = new Map();

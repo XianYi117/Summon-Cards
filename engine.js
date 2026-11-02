@@ -751,9 +751,9 @@
           this.note(`【回合結束】已獻祭石像 ${t.id} 重新直立`, i); await this.ui.ev('statueMove', { i });
         }
         for (let n = this.fx(p, 'endDiscBottom'); n > 0 && p.disc.length; n--) {
-          const [c] = (await this.ctrl[i].pick(this, i, 'discBottom', { cards: p.disc.slice(), n: 1, title: '【回合結束】：選棄牌區 1 張放回牌庫底' })) || [];
-          const x = p.disc.includes(c) ? c : p.disc[0]; p.disc.splice(p.disc.indexOf(x), 1); p.deck.unshift(x);
-          this.note(`【回合結束】${x.id} 放回牌庫底`, i);
+          const [c] = (await this.ctrl[i].pick(this, i, 'discBottom', { cards: p.disc.slice(), n: 1, title: '【回合結束】：選棄牌區 1 張放回牌庫底並洗勻' })) || [];
+          const x = p.disc.includes(c) ? c : p.disc[0]; p.disc.splice(p.disc.indexOf(x), 1); p.deck.unshift(x); shuffle(p.deck);
+          this.note(`【回合結束】${x.id} 放回牌庫並洗勻`, i);
         }
       }
       await this.l13Cleanup();
