@@ -187,6 +187,7 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
       <button class="btn primary" id="saveBtn">儲存</button>
       <button class="btn" id="outBtn">輸出</button>
       <button class="btn" id="loadBtn">我的牌組</button>
+      <button class="btn" id="preBtn">預組牌組</button>
       <button class="btn" id="newBtn">開新牌組</button>
     </div>
     <div class="minor"><button id="clear">清空勾選</button></div>
@@ -325,6 +326,7 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
   const savedDeck = () => st.deckIdx >= 0 ? loadMyDecks()[st.deckIdx] || null : null;
   function dirty() {
     const s = savedDeck();
+    if (!s && st.preset) { const pp = PRESETS.find(x => x.no === st.preset); return !pp || pp.cards.slice().sort().join() !== sorted().join(); }
     if (!s) return st.sel.size > 0;
     return [...s.cards].sort().join() !== sorted().join() || (s.leader || '') !== st.leader || (s.name || DEFAULT_DECK_NAME) !== current().name;
   }
@@ -336,15 +338,16 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
       tags.push(s.cloud && s.up ? '<span class="tag" title="改過的內容會在連上資料庫時自動送出">等待同步</span>' : s.cloud ? (s.via ? '<span class="tag ok" title="從其他裝置同步來的分享牌組">已分享．其他裝置</span>' : '<span class="tag ok" title="所有玩家都能在遊戲的「玩家分享」使用">已分享</span>')
         : deckProblems(s.cards).length ? '<span class="tag bad">不符規則</span>' : Cloud.on ? '<span class="tag">等待上傳</span>' : '<span class="tag">只在這台</span>');
       if (dirty()) tags.push('<span class="tag warn">有變更未儲存</span>');
-    } else if (st.sel.size) tags.push('<span class="tag warn">還沒儲存</span>');
-    h.innerHTML = `<b>${s ? esc(deckTitle(s)) : '新牌組'}</b>${tags.join('')}<span class="sp"></span>${s ? '<button class="btn small" id="headDel">刪除這副</button>' : ''}`;
+    } else if (st.preset) { const pp = PRESETS.find(x => x.no === st.preset); tags.push('<span class="tag" title="預組不會被修改；按「儲存」會另存成你自己的新牌組">預組．儲存會另存新牌組</span>'); if (pp && [...st.sel].sort().join() !== pp.cards.slice().sort().join()) tags.push('<span class="tag warn">已修改，還沒儲存</span>'); }
+    else if (st.sel.size) tags.push('<span class="tag warn">還沒儲存</span>');
+    h.innerHTML = `<b>${s ? esc(deckTitle(s)) : st.preset ? '預組 ' + esc(st.preset + '.' + ((PRESETS.find(x => x.no === st.preset) || {}).name || '')) : '新牌組'}</b>${tags.join('')}<span class="sp"></span>${s ? '<button class="btn small" id="headDel">刪除這副</button>' : ''}`;
     if (s) h.querySelector('#headDel').onclick = () => { if (removeDeck(st.deckIdx)) loadDeck({}, -1); };
   }
   function refresh() { renderGrid(); renderSide(); if (!$('#print').hidden) renderPrint(); persistDraft(); }
-  function persistDraft() { try { localStorage.setItem('summon_builder_draft', JSON.stringify({ set: CARD_SET, sel: [...st.sel], leader: st.leader, name: st.name, deckIdx: st.deckIdx })); } catch { } }
+  function persistDraft() { try { localStorage.setItem('summon_builder_draft', JSON.stringify({ set: CARD_SET, sel: [...st.sel], leader: st.leader, name: st.name, deckIdx: st.deckIdx, preset: st.preset || 0 })); } catch { } }
   function loadDeck(d, idx = -1) {
     st.sel = new Set((d.cards || []).filter(id => CARDS[id])); st.leader = LEADERS[d.leader] ? d.leader : '';
-    st.name = d.name && d.name !== DEFAULT_DECK_NAME ? d.name : ''; st.no = d.no || 0; st.deckIdx = idx; refresh();
+    st.name = d.name && d.name !== DEFAULT_DECK_NAME ? d.name : ''; st.no = d.no || 0; st.deckIdx = idx; st.preset = idx < 0 && d.preset ? d.preset : 0; refresh();
   }
   const current = () => ({ set: CARD_SET, no: st.no || 0, name: st.name.trim().replace(/^\d+\s*[.．、]\s*/, '') || DEFAULT_DECK_NAME, leader: st.leader, cards: sorted(), updated: new Date().toISOString() });
   const ruleMsg = () => { const p = deckProblems(sorted()); return st.sel.size ? (p.length ? '不符合卡牌構築規定：' + p.join('；') : '') : '還沒選卡'; };
@@ -355,7 +358,7 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
     if (asNew || st.deckIdx < 0 || !list[st.deckIdx]) { st.no = nextDeckNo(list); list.push(current()); st.deckIdx = list.length - 1; }
     else { const o = list[st.deckIdx]; st.no = o.no || nextDeckNo(list); list[st.deckIdx] = { ...current(), cloud: o.cloud || 0, ...(o.via ? { via: o.via } : {}), ...(o.cloud ? { up: 1 } : {}) }; }
     if (!saveMyDecks(list)) { toast('瀏覽器不允許儲存'); return false; }
-    upload(st.deckIdx);
+    upload(st.deckIdx); st.preset = 0;
     renderSide(); persistDraft(); toast(`已儲存「${deckTitle(current())}」，遊戲的牌組選單裡可以選`);
     return true;
   }
@@ -432,6 +435,25 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
   const sharedRows = l => { const mine = new Set(loadMyDecks().filter(x => x.cloud).map(x => x.no)); l = l.filter(x => !x.mine && !mine.has(x.no) && x.updated >= CARD_SET_SINCE); return l.length ? l.map(x => {
       const c = tally(x.cards);
       return `<div><span><b>${esc(deckTitle(x))}</b><small>火 ${c.F}．水 ${c.W}．草 ${c.G}${LEADERS[x.leader] ? `．${esc(LEADERS[x.leader].name)}` : ''}</small></span><button class="btn small" data-sh="${x.no}">載入</button></div>`; }).join('') : '<p class="hint">目前沒有其他玩家分享的牌組。</p>'; };
+  // 預組（電腦牌組）：只能閱覽、載入；儲存一律另存成自己的新牌組，不會改到預組
+  const presetRows = () => ['初階', '進階'].map(t => `<h4>${t}預組</h4><div class="decklist">` + PRESETS.filter(p => p.tier === t).map(p => {
+      const c = tally(p.cards), L = LEADERS[p.leader];
+      return `<div class="${st.preset === p.no && st.deckIdx < 0 ? 'cur' : ''}"><span><b>${p.no}.${esc(p.name)}</b><small>火 ${c.F}．水 ${c.W}．草 ${c.G}${L ? `．建議隊長 ${p.leader} ${esc(L.name)}` : ''}</small><small>${esc(p.desc || '')}</small></span><button class="btn small" data-pre="${p.no}">閱覽／載入</button></div>`; }).join('') + '</div>').join('');
+  function bindPresets(d, close) {
+    d.querySelectorAll('[data-pre]').forEach(b => b.onclick = () => {
+      const p = PRESETS.find(x => x.no === +b.dataset.pre); if (!p) return;
+      if (!(st.preset === p.no && st.deckIdx < 0) && !okToLeave()) return;
+      loadDeck({ cards: p.cards, leader: p.leader, name: p.name, preset: p.no }, -1); close();
+      toast(`已載入預組「${p.name}」。可以直接修改；按「儲存」會另存成你自己的新牌組，預組不會被改到`);
+    });
+  }
+  function openPresets() {
+    const { d, close } = dialog(`<h3>預組牌組<small style="font-weight:normal;color:var(--muted);margin-left:8px">電腦也會使用這些牌組</small></h3>
+      <p class="hint">載入後可以看、可以改，但預組本身不會被修改；按「儲存」會存成你自己的新牌組。</p>
+      ${presetRows()}
+      <div class="btns"><button class="btn" data-close>關閉</button></div>`);
+    bindPresets(d, close);
+  }
   const tally = cards => { const c = { F: 0, W: 0, G: 0 }; cards.forEach(id => CARDS[id] && c[id[0]]++); return c; };
   function deckTag(x) {
     if (isOldDeck(x)) return '<span class="tag bad">舊版卡池</span>';
@@ -501,6 +523,7 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
     d.querySelector('#dNew').onclick = () => { if (!okToLeave()) return; loadDeck({}, -1); close(); };
   }
   $('#loadBtn').onclick = openDecks;
+  $('#preBtn').onclick = openPresets;
   $('#newBtn').onclick = () => { if (!st.sel.size && st.deckIdx < 0) { toast('已經是新牌組'); return; } if (!okToLeave()) return; loadDeck({}, -1); toast('開新牌組'); };
   $('#clear').onclick = () => { if (!st.sel.size && !st.leader) return; if (!confirm('清空目前勾選的卡和隊長？（已儲存的牌組不受影響，除非再按儲存）')) return; st.sel.clear(); st.leader = ''; refresh(); };
 
@@ -638,9 +661,10 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
   // ---------- 起始：網址帶牌組 > 上次草稿 ----------
   const h = new URLSearchParams(location.hash.slice(1));
   if (h.get('deck')) loadDeck({ ...parseDeckCode(h.get('deck')), name: h.get('name') || '' });
-  else { try { const d = JSON.parse(localStorage.getItem('summon_builder_draft') || 'null'); if (d && d.set === CARD_SET) { loadDeck({ cards: d.sel, leader: d.leader, name: d.name }, d.deckIdx); } } catch { } }
+  else { try { const d = JSON.parse(localStorage.getItem('summon_builder_draft') || 'null'); if (d && d.set === CARD_SET) { loadDeck({ cards: d.sel, leader: d.leader, name: d.name, preset: d.preset }, d.deckIdx); } } catch { } }
   renderFilters(); refresh(); showDetail('');
-  if (h.has('manage')) { history.replaceState(null, '', location.pathname); openDecks(); }
+  if (h.has('presets')) { history.replaceState(null, '', location.pathname); openPresets(); }
+  else if (h.has('manage')) { history.replaceState(null, '', location.pathname); openDecks(); }
   else if (h.has('new')) { history.replaceState(null, '', location.pathname); if (st.sel.size || st.deckIdx >= 0) { if (okToLeave()) loadDeck({}, -1); } }
 })();
 </script>
