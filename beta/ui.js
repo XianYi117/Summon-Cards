@@ -57,8 +57,73 @@
   const leaderIds = Object.keys(LEADERS);
   // 隨機隊長只從這些隊長中挑（L10～L13 調整中，暫不參與隨機；仍可手動選）
   const RANDOM_LEADERS = leaderIds.filter(id => !['L10', 'L11', 'L12', 'L13'].includes(id));
-  let showAllShared = false;
-  window.onCloudDecks = () => { if (!$('#pick').hidden) renderPick(); };
+  window.onCloudDecks = () => { if (!$('#pick').hidden) { renderPick(); if (deckPop.open) deckPop.render(); } };
+  // ---------- 選擇牌組視窗 ----------
+  const DECK_TABS = [['preset', '預組'], ['mine', '我的牌組'], ['shared', '玩家分享'], ['random', '隨機']];
+  const tabOf = d => !d ? 'preset' : (d.tier === '初階' || d.tier === '進階') ? 'preset' : d.tier === '個人' ? 'mine' : d.tier === '分享' ? 'shared' : 'random';
+  function deckSub(d) {
+    const comp = d.comp ? Object.entries(d.comp).filter(([, v]) => v).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ') : `全部 ${Object.keys(CARDS).length} 張中隨機 20 張．每屬性最多 ${ATTR_MAX}`;
+    return comp + (d.leader && LEADERS[d.leader] ? `．${LEADERS[d.leader].name}` : '');
+  }
+  const deckPop = { open: false, tab: 'preset', q: '', side: null, render() { } };
+  function openDeckPop(side) {
+    if (net.on && net.myCfg) return;
+    let pop = $('#deckPop');
+    if (!pop) { pop = el('div', 'dpop'); pop.id = 'deckPop'; document.body.appendChild(pop); }
+    deckPop.side = side; deckPop.open = true; deckPop.tab = tabOf(DECKS[side.deck]); deckPop.q = '';
+    const close = () => { pop.hidden = true; deckPop.open = false; document.removeEventListener('keydown', esc); };
+    const esc = e => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', esc);
+    pop.onclick = e => { if (e.target === pop) close(); };
+    const keysOf = tab => Object.keys(DECKS).filter(k => tabOf(DECKS[k]) === tab);
+    deckPop.render = () => {
+      const s = deckPop.side, tab = deckPop.tab;
+      pop.innerHTML = '';
+      const bx = el('div', 'dbox'); pop.appendChild(bx);
+      const head = el('div', 'dhead', '<h3>選擇牌組</h3>'); const x = el('button', 'btn ghost small', '關閉'); x.onclick = close; head.appendChild(x); bx.appendChild(head);
+      const tabs = el('div', 'dtabs');
+      for (const [t, name] of DECK_TABS) {
+        const n = keysOf(t).length;
+        const b = el('button', 'dtab', `${name}${t === 'mine' || t === 'shared' ? `<small>${n}</small>` : ''}`); b.setAttribute('aria-selected', t === tab);
+        b.onclick = () => { deckPop.tab = t; deckPop.q = ''; deckPop.render(); }; tabs.appendChild(b);
+      }
+      bx.appendChild(tabs);
+      let keys = keysOf(tab);
+      if ((tab === 'shared' || tab === 'mine') && keys.length > 6) {
+        const q = el('input', 'dsearch'); q.type = 'search'; q.placeholder = '搜尋牌組名稱或編號…'; q.value = deckPop.q;
+        q.oninput = () => { deckPop.q = q.value; const pos = q.selectionStart; deckPop.render(); const nq = pop.querySelector('.dsearch'); nq.focus(); nq.setSelectionRange(pos, pos); };
+        bx.appendChild(q);
+        const t = deckPop.q.trim().toLowerCase(); if (t) keys = keys.filter(k => DECKS[k].label.toLowerCase().includes(t));
+      }
+      const list = el('div', 'dlist');
+      const row = k => {
+        const d = DECKS[k];
+        const b = el('button', 'drow', `<span class="dpname">${d.label}</span><small>${deckSub(d)}</small>${d.desc ? `<span class="ddesc">${d.desc}</span>` : ''}`);
+        b.setAttribute('aria-pressed', s.deck === k);
+        b.onclick = () => {
+          s.deck = k;
+          if (d.leader && (!s.leader || s.leader === 'RANDOM') && LEADERS[d.leader]) { s.leader = d.leader; if (d.leader !== 'L11') delete s.main; }
+          if (s.leader === 'L11' && !s.mainTouched && d.comp) s.main = Object.entries(d.comp).sort((a, b) => b[1] - a[1])[0][0];
+          close(); renderPick();
+        };
+        return b;
+      };
+      if (tab === 'preset') {
+        for (const [tier, title] of [['初階', '初階預組（效果簡單，適合新手）'], ['進階', '進階預組']]) {
+          const ks = keys.filter(k => DECKS[k].tier === tier); if (!ks.length) continue;
+          list.appendChild(el('div', 'dtier', title)); ks.forEach(k => list.appendChild(row(k)));
+        }
+      } else keys.forEach(k => list.appendChild(row(k)));
+      if (!keys.length) list.appendChild(el('div', 'empty', tab === 'mine' ? '還沒有自己的牌組。按下方「＋ 新增牌組」到卡牌構築建立。' : tab === 'shared' ? (deckPop.q ? '找不到符合的牌組。' : '目前沒有其他玩家分享的牌組。') : '沒有牌組。'));
+      bx.appendChild(list);
+      const foot = el('div', 'dfoot');
+      const bl = el('button', 'btn ghost small', '＋ 新增牌組'); bl.onclick = () => { location.href = SHARED_BASE + '../builder/#new'; };
+      const bm = el('button', 'btn ghost small', '管理我的牌組（編輯／刪除）'); bm.onclick = () => { location.href = SHARED_BASE + '../builder/#manage'; };
+      foot.append(bl, bm); bx.appendChild(foot);
+    };
+    deckPop.render(); pop.hidden = false;
+    const sel = pop.querySelector('.drow[aria-pressed="true"]'); if (sel) sel.scrollIntoView({ block: 'center' });
+  }
   function renderPick() {
     const s = cfg[pickStep], isFoe = pickStep === 'foe';
     $('#pickStep').textContent = net.on ? `連線對戰．房間 ${net.code}` : isFoe ? 'STEP 2 / 2' : 'STEP 1 / 2';
@@ -72,7 +137,7 @@
       c.tabIndex = 0; c.setAttribute('role', 'button');
       c.setAttribute('aria-label', id === 'RANDOM' ? '隨機隊長' : `${id} ${LEADERS[id].name}`);
       if (s.leader === id) c.classList.add('chosen');
-      const choose = () => { if (net.on && net.myCfg) return; s.leader = id; if (id !== 'L11') delete s.main; renderPick(); if (innerWidth < 760) $('#pickInfo').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+      const choose = () => { if (net.on && net.myCfg) return; s.leader = id; if (id !== 'L11') delete s.main; renderPick(); if (!s.deck) openDeckPop(s); else if (innerWidth < 760) $('#pickInfo').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
       c.onclick = choose; c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } };
       if (id !== 'RANDOM') tilt(c, 10);
       grid.appendChild(c);
@@ -93,35 +158,18 @@
         inf.appendChild(row);
       }
     }
+    // 牌組：右欄只顯示目前選的牌組，按一下開「選擇牌組」視窗
     inf.appendChild(el('div', 'lab', '牌組'));
-    for (const [tier, title] of [['初階', '初階預組'], ['進階', '進階預組'], ['個人', '個人構築'], ['分享', '玩家分享'], ['其他', '其他']]) {
-      let keys = Object.keys(DECKS).filter(k => (DECKS[k].tier || '其他') === tier);
-      if (!keys.length) continue;
-      // 玩家分享太多時先收合，只顯示最新 6 副（選中的那副一定顯示）
-      const more = tier === '分享' && keys.length > 6 && !showAllShared;
-      if (more) keys = keys.filter((k, i) => i < 6 || k === s.deck);
-      inf.appendChild(el('div', 'dtier', title + (tier === '分享' ? `<small>．${Object.keys(DECKS).filter(k => DECKS[k].tier === '分享').length} 副</small>` : '')));
-      const dk = el('div', 'chips decks');
-      for (const key of keys) {
-        const d = DECKS[key];
-        const sub = d.fixed ? `<small>${d.custom ? '自訂．' : ''}${Object.entries(d.comp).filter(([, v]) => v).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}${d.leader ? `．${LEADERS[d.leader].name}` : ''}</small>` : d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : `<small>全部 ${Object.keys(CARDS).length} 張中隨機 20 張．每屬性最多 ${ATTR_MAX}</small>`;
-        const b = el('button', 'chip', `<span>${d.label}</span>${sub}`); b.setAttribute('aria-pressed', s.deck === key);
-        b.onclick = () => {
-          s.deck = key;
-          if (d.leader && !(net.on && net.myCfg)) { s.leader = d.leader; if (d.leader !== 'L11') delete s.main; }
-          if (s.leader === 'L11' && !s.mainTouched && d.comp) s.main = Object.entries(d.comp).sort((a, b) => b[1] - a[1])[0][0];
-          renderPick();
-        };
-        dk.appendChild(b);
-      }
-      if (more) { const mb = el('button', 'chip', '<span>顯示全部…</span>'); mb.onclick = () => { showAllShared = true; renderPick(); }; dk.appendChild(mb); }
-      inf.appendChild(dk);
+    const cur = DECKS[s.deck];
+    const box = el('button', 'deckpick' + (cur ? ' on' : ''), cur ? `<span class="dpname">${cur.label}</span><small>${deckSub(cur)}</small><em>更換</em>` : `<span class="dpname">選擇牌組…</span><small>預組、我的牌組、玩家分享、隨機</small>`);
+    box.onclick = () => openDeckPop(s);
+    inf.appendChild(box);
+    if (cur && cur.desc) inf.appendChild(el('div', 'desc small', cur.desc));
+    if (cur && cur.leader && LEADERS[cur.leader] && s.leader && s.leader !== cur.leader && !(net.on && net.myCfg)) {
+      const tip = el('div', 'dtip', `這副牌組建議搭配「${LEADERS[cur.leader].name}」 `);
+      const use = el('button', 'btn ghost small', '改用'); use.onclick = () => { s.leader = cur.leader; if (cur.leader !== 'L11') delete s.main; renderPick(); };
+      tip.appendChild(use); inf.appendChild(tip);
     }
-    if (DECKS[s.deck] && DECKS[s.deck].desc) inf.appendChild(el('div', 'desc', DECKS[s.deck].desc));
-    const brow = el('div', 'mrow'); brow.style.justifyContent = 'flex-start';
-    const bl = el('button', 'btn ghost small', '＋ 新增牌組'); bl.onclick = () => { location.href = SHARED_BASE + '../builder/#new'; };
-    const bm = el('button', 'btn ghost small', '管理我的牌組（編輯／刪除）'); bm.onclick = () => { location.href = SHARED_BASE + '../builder/#manage'; };
-    brow.append(bl, bm); inf.appendChild(brow);
     const ok = s.leader && s.deck && (s.leader !== 'L11' || s.main);
     const act = el('div', 'pick-actions');
     const next = el('button', 'btn primary', net.on ? (net.myCfg ? '已準備，等待對手…' : '準備完成') : isFoe ? '確認對手' : '下一步'); next.disabled = !ok || (net.on && !!net.myCfg);
