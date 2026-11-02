@@ -73,7 +73,7 @@ const CARDS = {
   G08: {"name": "草樹", "race": "樹", "act": "【對方】獻祭石像時：我方【多抽】 1 張", "sac": "本回合對手不能獻祭（可被【反擊】回應）", "role": "干擾控制", "fa": "onOppSac", "fs": "block"},
   G09: {"name": "草花", "race": "花", "act": "【回合結束】：棄牌區 1 張放回牌庫底", "sac": "【多抽】 2 張", "role": "循環續航", "fa": "endDiscBottom", "fs": "draw2"},
   G10: {"name": "草蟲", "race": "蟲", "act": "【補牌】：【多抽】 1 張", "sac": "破壞對手 1 座直立石像（放入對手棄牌區）", "role": "循環續航、破壞", "fa": "drawPlus1", "fs": "destroy"},
-  G11: {"name": "草鹿", "race": "鹿", "act": "【回合結束】：我方已獻祭石像 1 座重新直立", "sac": "【多抽】 2 張", "role": "獻祭、同色石像", "fa": "endUpright", "fs": "draw2"},
+  G11: {"name": "草鹿", "race": "鹿", "act": "【回合結束】：我方已獻祭石像 1 座放入棄牌區", "sac": "【多抽】 2 張", "role": "獻祭、同色石像", "fa": "endSacDisc", "fs": "draw2"},
   G12: {"name": "草仙", "race": "仙", "act": "【我方】獻祭石像時：【多抽】 1 張", "sac": "從棄牌區取回 2 張", "role": "獻祭、循環續航", "fa": "onMySac", "fs": "retrieve2"},
   G13: {"name": "草仙", "race": "仙", "act": "【回合結束】：我方已獻祭石像 1 座洗回牌庫", "sac": "本回合我方剋制加成 +2", "role": "獻祭、循環續航", "fa": "endSacBack", "fs": "counterPlus2"},
   G14: {"name": "草蟲", "race": "蟲", "act": "牌型有 AA：戰力 +1", "sac": "變換 1 張手牌或出戰牌的屬性（本回合有效）", "role": "牌型、對子雜色、剋屬", "fa": "pair1", "fs": "recolor"},
@@ -152,7 +152,7 @@ function randomDeckIds(rand = Math.random) {
 // 卡圖放在 shared/cards/（原圖 600px）與 shared/cards/sm/（小圖 300px）。
 // 路徑以這支 data.js 的位置為準，所以 beta/、builder/ 或之後新增的頁面都能共用同一份卡圖。
 const SHARED_BASE = (document.currentScript && document.currentScript.src || location.href).replace(/[^/]*$/, '');
-const IMG_VER = '1102'; // 換卡圖時改這個，瀏覽器和快取就會抓新圖
+const IMG_VER = '1102b'; // 換卡圖時改這個，瀏覽器和快取就會抓新圖
 const img = (id, hi) => hi ? `${SHARED_BASE}cards/${id}.webp?v=${IMG_VER}` : `${SHARED_BASE}cards/sm/${id}.webp?v=${IMG_VER}`;
 // 只預載「這一場用得到」的卡（雙方牌組＋隊長），卡池再大，載入量也不會跟著變大
 const IMG_CACHE = new Map();

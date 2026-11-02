@@ -52,7 +52,7 @@
     stF: .7, stW: .7, stG: .7, sac2: .6, fewer2: .7, behind2: .7, lost1: .5, sacced1: .5, destroyed1: .3, oppM1: 1, oppSac3: .3,
     cPlus2: .8, cPunish: .5, cRecall: .5, cDiscard: .5, leftCore: .3, peekHand: .4, peekPlay1: .4, mixSummon: .4,
     cutDraw: .4, oppCap: .9, drawPlus1: .9, drawSwap: .6, drawRetrieve: .6, drawScry: .5, drawLost: .5, drawTie: .3, drawBehind: .5,
-    drawCut: .7, oppSac2: .4, oppSacced1: .5, endUpright: .6, onMyBrokenP1: .3,
+    drawCut: .7, oppSac2: .4, oppSacced1: .5, endUpright: .6, endSacDisc: -.1, onMyBrokenP1: .3,
     onMySac: .5, onOppSac: .5, endHandBottom: .2, endSacBack: .3, endDiscBottom: .3, onOppBroken: .3, onMyBroken2: .5, onAnyBroken: .4, onMyBrokenRet: .4,
   };
   const SAC_VAL = {
@@ -739,6 +739,11 @@
           const t = await this.pickStatue(i, this.sacked(p), '【回合結束】：選我方 1 座已獻祭石像洗回牌庫', 'mySacToDeck'); if (!t) break;
           this.removeStatue(i, t); p.deck.push({ uid: t.uid, id: t.id }); shuffle(p.deck);
           this.note(`【回合結束】已獻祭石像 ${t.id} 洗回牌庫`, i); await this.ui.ev('statueMove', { i });
+        }
+        for (let n = this.fx(p, 'endSacDisc'); n > 0; n--) {
+          const t = await this.pickStatue(i, this.sacked(p), '【回合結束】：選我方 1 座已獻祭石像放入棄牌區', 'mySacToDisc'); if (!t) break;
+          this.removeStatue(i, t); p.disc.push({ uid: t.uid, id: t.id });
+          this.note(`【回合結束】已獻祭石像 ${t.id} 放入棄牌區`, i); await this.ui.ev('statueMove', { i });
         }
         for (let n = this.fx(p, 'endUpright'); n > 0; n--) {
           const t = await this.pickStatue(i, this.sacked(p), '【回合結束】：選我方 1 座已獻祭石像重新直立', 'mySacUp'); if (!t) break;
