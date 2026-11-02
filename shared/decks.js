@@ -20,7 +20,7 @@ function deckProblems(cards) {
 const DEFAULT_DECK_NAME = '個人牌組';
 // 卡池版本：2026-11-02 換成 90 張新卡表、重新編號。舊版卡池的牌組卡號對不上，只能刪除，不能再用
 const CARD_SET = '1102';
-const CARD_SET_SINCE = Date.UTC(2026, 10, 2, 8, 0); // 這個時間以前上傳的分享牌組都是舊版卡池
+const CARD_SET_SINCE = Date.UTC(2026, 10, 2, 5, 55); // 這個時間（vj.1102 上線）以前上傳的分享牌組都是舊版卡池
 const isOldDeck = d => !d || d.set !== CARD_SET;
 // 牌組編號：預組 1～11，個人牌組接在後面，刪除後編號不重用
 function nextDeckNo(list) {
