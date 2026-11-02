@@ -91,7 +91,7 @@ const Cloud = (() => {
     const list = loadMyDecks(); let changed = false;
     for (const d of list) {
       // up＝本機改過但還沒成功送上去（例如離線時儲存）
-      if ((d.cloud && !d.up) || deckProblems(d.cards).length) continue;
+      if ((d.cloud && !d.up) || isOldDeck(d) || deckProblems(d.cards).length) continue;
       try { const no = await saveDeck(d); if (no !== d.no) delete d.via; d.no = no; d.cloud = 1; delete d.up; changed = true; } catch { break; }
     }
     // 自己名下的：在其他裝置被改過或刪掉時，這台跟著更新
@@ -108,9 +108,9 @@ const Cloud = (() => {
     let changed = false;
     const mine = server.filter(d => d.mine), gone = new Set(pendingDel().map(x => x.no));
     for (const s of mine) {
-      if (gone.has(s.no)) continue;
+      if (gone.has(s.no) || s.updated < CARD_SET_SINCE) continue;
       const i = list.findIndex(d => d.cloud && d.no === s.no);
-      const fresh = { no: s.no, name: s.name, leader: s.leader || '', cards: s.cards, updated: new Date(s.updated).toISOString(), cloud: 1 };
+      const fresh = { set: CARD_SET, no: s.no, name: s.name, leader: s.leader || '', cards: s.cards, updated: new Date(s.updated).toISOString(), cloud: 1 };
       if (via) fresh.via = via;
       if (i < 0) { if (via) { list.push(fresh); changed = true; } }
       else if (!list[i].up && s.updated > Date.parse(list[i].updated || 0) + 1000) { list[i] = { ...fresh, ...(list[i].via ? { via: list[i].via } : {}) }; changed = true; }
@@ -149,7 +149,7 @@ const Cloud = (() => {
   const add = list => {
     for (const k of Object.keys(DECKS)) if (DECKS[k].tier === '分享') delete DECKS[k];
     for (const d of list.slice(0, 40)) {
-      if (d.mine || mineNos.has(d.no)) continue;
+      if (d.mine || mineNos.has(d.no) || d.updated < CARD_SET_SINCE) continue;
       const cards = (d.cards || []).filter(id => CARDS[id]);
       if (deckProblems(cards).length) continue;
       const comp = { F: 0, W: 0, G: 0 }; cards.forEach(id => comp[id[0]]++);

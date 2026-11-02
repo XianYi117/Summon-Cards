@@ -341,12 +341,12 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
     if (s) h.querySelector('#headDel').onclick = () => { if (removeDeck(st.deckIdx)) loadDeck({}, -1); };
   }
   function refresh() { renderGrid(); renderSide(); if (!$('#print').hidden) renderPrint(); persistDraft(); }
-  function persistDraft() { try { localStorage.setItem('summon_builder_draft', JSON.stringify({ sel: [...st.sel], leader: st.leader, name: st.name, deckIdx: st.deckIdx })); } catch { } }
+  function persistDraft() { try { localStorage.setItem('summon_builder_draft', JSON.stringify({ set: CARD_SET, sel: [...st.sel], leader: st.leader, name: st.name, deckIdx: st.deckIdx })); } catch { } }
   function loadDeck(d, idx = -1) {
     st.sel = new Set((d.cards || []).filter(id => CARDS[id])); st.leader = LEADERS[d.leader] ? d.leader : '';
     st.name = d.name && d.name !== DEFAULT_DECK_NAME ? d.name : ''; st.no = d.no || 0; st.deckIdx = idx; refresh();
   }
-  const current = () => ({ no: st.no || 0, name: st.name.trim().replace(/^\d+\s*[.．、]\s*/, '') || DEFAULT_DECK_NAME, leader: st.leader, cards: sorted(), updated: new Date().toISOString() });
+  const current = () => ({ set: CARD_SET, no: st.no || 0, name: st.name.trim().replace(/^\d+\s*[.．、]\s*/, '') || DEFAULT_DECK_NAME, leader: st.leader, cards: sorted(), updated: new Date().toISOString() });
   const ruleMsg = () => { const p = deckProblems(sorted()); return st.sel.size ? (p.length ? '不符合卡牌構築規定：' + p.join('；') : '') : '還沒選卡'; };
   function save(asNew) {
     if (ruleMsg()) { toast(ruleMsg()); return false; }
@@ -418,7 +418,7 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
     <div class="btns"><button class="btn" data-copy="#sBuild">複製構築連結</button><button class="btn" data-close>關閉</button></div>`);
   }
   function exportJson() {
-    const out = (loadMyDecks().length ? loadMyDecks() : [current()]).map(d => ({ name: d.name, leader: d.leader, cards: d.cards }));
+    const out = (loadMyDecks().length ? loadMyDecks() : [current()]).filter(d => !isOldDeck(d)).map(d => ({ set: CARD_SET, name: d.name, leader: d.leader, cards: d.cards }));
     const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     const a = el('a'); a.href = URL.createObjectURL(blob); a.download = '召喚_我的牌組.json'; a.click(); URL.revokeObjectURL(a.href);
   }
@@ -429,11 +429,12 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
     const t = deckTitle(l[i]); l.splice(i, 1); saveMyDecks(l); if (st.deckIdx === i) st.deckIdx = -1; else if (st.deckIdx > i) st.deckIdx--;
     renderSide(); persistDraft(); toast(`已刪除「${t}」`); return true;
   }
-  const sharedRows = l => { const mine = new Set(loadMyDecks().filter(x => x.cloud).map(x => x.no)); l = l.filter(x => !x.mine && !mine.has(x.no)); return l.length ? l.map(x => {
+  const sharedRows = l => { const mine = new Set(loadMyDecks().filter(x => x.cloud).map(x => x.no)); l = l.filter(x => !x.mine && !mine.has(x.no) && x.updated >= CARD_SET_SINCE); return l.length ? l.map(x => {
       const c = tally(x.cards);
       return `<div><span><b>${esc(deckTitle(x))}</b><small>火 ${c.F}．水 ${c.W}．草 ${c.G}${LEADERS[x.leader] ? `．${esc(LEADERS[x.leader].name)}` : ''}</small></span><button class="btn small" data-sh="${x.no}">載入</button></div>`; }).join('') : '<p class="hint">目前沒有其他玩家分享的牌組。</p>'; };
   const tally = cards => { const c = { F: 0, W: 0, G: 0 }; cards.forEach(id => CARDS[id] && c[id[0]]++); return c; };
   function deckTag(x) {
+    if (isOldDeck(x)) return '<span class="tag bad">舊版卡池</span>';
     if (deckProblems(x.cards.filter(id => CARDS[id])).length) return '<span class="tag bad">不符規則</span>';
     if (x.cloud && x.up) return '<span class="tag">等待同步</span>';
     if (x.cloud) return `<span class="tag ok">${x.via ? '已分享．其他裝置' : '已分享'}</span>`;
@@ -445,7 +446,7 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
       <div class="decklist">${list.length ? list.map((x, i) => {
         const c = tally(x.cards);
         return `<div class="${i === st.deckIdx ? 'cur' : ''}"><span><b>${esc(deckTitle(x))}</b> ${deckTag(x)}<small>火 ${c.F}．水 ${c.W}．草 ${c.G}．共 ${x.cards.length} 張${LEADERS[x.leader] ? `．${esc(LEADERS[x.leader].name)}` : '．未選隊長'}</small></span>
-          <button class="btn small" data-load="${i}">${i === st.deckIdx ? '編輯中' : '編輯'}</button><button class="btn small" data-del="${i}">刪除</button></div>`;
+          <button class="btn small" data-load="${i}"${isOldDeck(x) ? ' disabled title="舊版卡池的卡號已重新編排，無法編輯"' : ''}>${i === st.deckIdx ? '編輯中' : '編輯'}</button><button class="btn small" data-del="${i}">刪除</button></div>`;
       }).join('') : '<p class="hint">還沒有儲存的牌組。勾選 20 張卡後按「儲存」。</p>'}</div>
       ${Cloud.on ? `<h4>玩家分享<small>別人上傳的牌組，載入後可以修改、另存成自己的</small></h4><div class="decklist" id="sharedList">${sharedRows(Cloud.cached())}</div>` : ''}
       <details><summary class="hint" style="cursor:pointer">匯入牌組（代碼、分享連結、卡號清單、JSON）</summary>
@@ -468,7 +469,8 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
             let added = 0, dup = 0, bad = 0;
             for (const x of j) {
               if (!x || !Array.isArray(x.cards)) { bad++; continue; }
-              const y = { name: String(x.name || DEFAULT_DECK_NAME).slice(0, 20), leader: LEADERS[x.leader] ? x.leader : '', cards: [...new Set(x.cards.filter(id => CARDS[id]))].sort(), no: 0, updated: new Date().toISOString() };
+              const y = { set: x.set === CARD_SET ? CARD_SET : 'old', name: String(x.name || DEFAULT_DECK_NAME).slice(0, 20), leader: LEADERS[x.leader] ? x.leader : '', cards: [...new Set(x.cards.filter(id => CARDS[id]))].sort(), no: 0, updated: new Date().toISOString() };
+              if (isOldDeck(y)) { bad++; continue; }
               if (deckProblems(y.cards).length) { bad++; continue; }
               if (have.has(key(y))) { dup++; continue; }
               have.add(key(y)); l.push(y); added++;
@@ -636,7 +638,7 @@ aside{border-left:1px solid var(--line);background:#12161d;padding:14px 16px;pos
   // ---------- 起始：網址帶牌組 > 上次草稿 ----------
   const h = new URLSearchParams(location.hash.slice(1));
   if (h.get('deck')) loadDeck({ ...parseDeckCode(h.get('deck')), name: h.get('name') || '' });
-  else { try { const d = JSON.parse(localStorage.getItem('summon_builder_draft') || sessionStorage.getItem('summon_builder_draft') || 'null'); if (d) { loadDeck({ cards: d.sel, leader: d.leader, name: d.name }, d.deckIdx); } } catch { } }
+  else { try { const d = JSON.parse(localStorage.getItem('summon_builder_draft') || 'null'); if (d && d.set === CARD_SET) { loadDeck({ cards: d.sel, leader: d.leader, name: d.name }, d.deckIdx); } } catch { } }
   renderFilters(); refresh(); showDetail('');
   if (h.has('manage')) { history.replaceState(null, '', location.pathname); openDecks(); }
   else if (h.has('new')) { history.replaceState(null, '', location.pathname); if (st.sel.size || st.deckIdx >= 0) { if (okToLeave()) loadDeck({}, -1); } }

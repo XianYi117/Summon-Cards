@@ -18,6 +18,10 @@ function deckProblems(cards) {
   return out;
 }
 const DEFAULT_DECK_NAME = '個人牌組';
+// 卡池版本：2026-11-02 換成 90 張新卡表、重新編號。舊版卡池的牌組卡號對不上，只能刪除，不能再用
+const CARD_SET = '1102';
+const CARD_SET_SINCE = Date.UTC(2026, 10, 2, 8, 0); // 這個時間以前上傳的分享牌組都是舊版卡池
+const isOldDeck = d => !d || d.set !== CARD_SET;
 // 牌組編號：預組 1～11，個人牌組接在後面，刪除後編號不重用
 function nextDeckNo(list) {
   const shared = typeof Cloud !== 'undefined' && Cloud.on ? Cloud.cached().map(d => d.no || 0) : []; // 避免和玩家分享的編號撞號（上傳後會改用資料庫發的號）
@@ -39,7 +43,7 @@ function saveMyDecks(list) { try { localStorage.setItem(DECK_STORE, JSON.stringi
     const comp = { F: 0, W: 0, G: 0 }; cards.forEach(id => comp[id[0]]++);
     DECKS[key] = { label: d.no ? deckTitle(d) : (d.name || '分享牌組'), comp, fixed: cards, leader: LEADERS[d.leader] ? d.leader : '', custom: true, tier: d.no ? '個人' : '其他', no: d.no };
   };
-  loadMyDecks().forEach((d, i) => add('MY' + i, d));
+  loadMyDecks().forEach((d, i) => { if (!isOldDeck(d)) add('MY' + i, d); });
   const h = new URLSearchParams(location.hash.slice(1));
   if (typeof document !== 'undefined' && h.get('deck')) add('LINK', { ...parseDeckCode(h.get('deck')), name: h.get('name') || '分享牌組' });
 })();

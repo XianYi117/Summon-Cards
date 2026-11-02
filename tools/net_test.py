@@ -10,7 +10,8 @@ BASE = 'http://localhost:8765/'
 async def pick(pg, leader_idx, deck):
     await pg.wait_for_selector('#leaderGrid .card', timeout=10000)
     await pg.click(f'#leaderGrid .card >> nth={leader_idx}')
-    await pg.click(f'#pickInfo .chip:has-text("{deck}")')
+    if not await pg.locator('#deckPop').is_visible(): await pg.click('.deckpick')
+    await pg.click(f'#deckPop .drow:has-text("{deck}")')
     await pg.click('.pick-actions button >> nth=-1')
 
 async def autoplay(pg, steps=1):
@@ -62,7 +63,7 @@ async def main(mode):
         b = await p.chromium.launch()
         if mode == 'normal':
             ctx, host, guest, errs, code = await setup(b, '')
-            await pick(host, 0, '1.烈焰突擊'); await pick(guest, 3, '4.屬性剋制')
+            await pick(host, 0, '1.烈焰突擊'); await pick(guest, 3, '4.烈火突襲')
             await host.wait_for_function("window.__summonState && JSON.parse(window.__summonState()||'{}').turn>=1", timeout=30000)
             for i in range(400):
                 a = await autoplay(host); c = await autoplay(guest)
@@ -73,7 +74,7 @@ async def main(mode):
             print('normal game: turns', sa['turn'], 'scores host', [x['s'] for x in sa['p']], 'guest', [x['s'] for x in sb['p']], 'in sync' if same else 'DESYNC', 'errors', errs)
         elif mode in ('reconnect', 'reconnect_host'):
             ctx, host, guest, errs, code = await setup(b, '')
-            await pick(host, 0, '1.烈焰突擊'); await pick(guest, 3, '4.屬性剋制')
+            await pick(host, 0, '1.烈焰突擊'); await pick(guest, 3, '4.烈火突襲')
             await host.wait_for_function("window.__summonState && JSON.parse(window.__summonState()||'{}').turn>=1", timeout=30000)
             killed = False; seen_overlay = False; recovered = False; played_while_down = False
             victim = guest if mode == 'reconnect' else host

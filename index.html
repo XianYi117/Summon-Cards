@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="召喚 vj.1030 雙人卡牌對戰網頁遊戲">
+<meta name="description" content="召喚 vj.1102 雙人卡牌對戰網頁遊戲">
 <title>召喚 SUMMON</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -359,6 +359,28 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 }
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 .dtier{font-size:12px;color:var(--gold-hi);letter-spacing:.1em;margin-top:6px}.chips.decks .chip{min-width:120px}
+/* 牌組：右欄摘要＋選擇視窗 */
+.deckpick{display:grid;gap:3px;text-align:left;border:1px solid var(--line);background:var(--stone);color:var(--text);border-radius:6px;padding:12px 14px;position:relative;cursor:pointer}
+.deckpick:hover{border-color:var(--gold)}.deckpick.on{border-color:var(--gold-hi);background:#2a2618}
+.deckpick .dpname{font-weight:700;font-size:16px}.deckpick small{color:var(--muted);font-size:12px}
+.deckpick em{position:absolute;right:12px;top:12px;font-style:normal;font-size:12px;color:var(--gold-hi)}
+.info .desc.small{font-size:13px;line-height:1.6;color:var(--muted)}
+.dtip{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dpop{position:fixed;inset:0;z-index:300;background:#05070bcc;display:grid;place-items:center;padding:16px}
+.dbox{background:linear-gradient(#1d232d,#141920);border:1px solid var(--gold);border-radius:10px;width:min(560px,100%);max-height:min(720px,90vh);display:flex;flex-direction:column;gap:10px;padding:16px;overflow:hidden}
+.dhead{display:flex;justify-content:space-between;align-items:center}.dhead h3{margin:0;font-family:var(--f-display);font-size:20px}
+.dtabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.dtab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:8px 12px;font-size:14px;cursor:pointer;display:flex;gap:6px;align-items:center}
+.dtab small{font-size:11px;background:#2a303b;border-radius:999px;padding:0 7px;color:var(--text)}
+.dtab[aria-selected="true"]{color:var(--gold-hi);border-bottom-color:var(--gold-hi)}
+.dsearch{background:var(--stone);border:1px solid var(--line);border-radius:5px;padding:7px 10px;color:var(--text);font-size:14px}
+.dlist{flex:1 1 auto;min-height:0;overflow:auto;display:grid;gap:6px;align-content:start;padding-right:2px}
+.dlist .dtier{margin:6px 0 0}
+.drow{display:grid;gap:2px;text-align:left;border:1px solid var(--line);background:var(--stone);color:var(--text);border-radius:6px;padding:9px 12px;cursor:pointer}
+.drow:hover{border-color:var(--gold)}.drow[aria-pressed="true"]{border-color:var(--gold-hi);background:#2a2618;box-shadow:0 0 0 1px var(--gold-hi)}
+.drow .dpname{font-weight:700}.drow small{color:var(--muted);font-size:12px}.drow .ddesc{font-size:12.5px;color:#c9c3b5;line-height:1.5}
+.dfoot{display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px}
+.dpop[hidden]{display:none}
 .rules h4{font-family:var(--f-display);font-size:16px;margin:16px 0 6px;color:var(--gold-hi);border-left:3px solid var(--gold);padding-left:8px;line-height:1.4}
 .rules .rnote{color:var(--muted);font-size:13px}.rules .rk{white-space:nowrap;color:var(--gold-hi);font-weight:700}.rules .rk small{color:var(--muted);font-weight:400}
 .rules .F{color:#ff7a62;font-weight:700}.rules .W{color:#6fb2ff;font-weight:700}.rules .G{color:#7fdc87;font-weight:700}
@@ -384,7 +406,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
         <button class="btn" id="btnGallery">圖鑑一覽</button>
         <button class="btn" id="btnBuilder" onclick="location.href=SHARED_BASE+'../builder/'">卡牌構築．列印</button>
       </div>
-      <div class="ver">版本 vj.1030.0．隊長 13 位．角色卡 108 種</div>
+      <div class="ver">版本 vj.1102．隊長 13 位．角色卡 90 種</div>
     </div>
   </section>
 

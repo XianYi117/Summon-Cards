@@ -57,8 +57,73 @@
   const leaderIds = Object.keys(LEADERS);
   // 隨機隊長只從這些隊長中挑（L10～L13 調整中，暫不參與隨機；仍可手動選）
   const RANDOM_LEADERS = leaderIds.filter(id => !['L10', 'L11', 'L12', 'L13'].includes(id));
-  let showAllShared = false;
-  window.onCloudDecks = () => { if (!$('#pick').hidden) renderPick(); };
+  window.onCloudDecks = () => { if (!$('#pick').hidden) { renderPick(); if (deckPop.open) deckPop.render(); } };
+  // ---------- 選擇牌組視窗 ----------
+  const DECK_TABS = [['preset', '預組'], ['mine', '我的牌組'], ['shared', '玩家分享'], ['random', '隨機']];
+  const tabOf = d => !d ? 'preset' : (d.tier === '初階' || d.tier === '進階') ? 'preset' : d.tier === '個人' ? 'mine' : d.tier === '分享' ? 'shared' : 'random';
+  function deckSub(d) {
+    const comp = d.comp ? Object.entries(d.comp).filter(([, v]) => v).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ') : `全部 ${Object.keys(CARDS).length} 張中隨機 20 張．每屬性最多 ${ATTR_MAX}`;
+    return comp + (d.leader && LEADERS[d.leader] ? `．${LEADERS[d.leader].name}` : '');
+  }
+  const deckPop = { open: false, tab: 'preset', q: '', side: null, render() { } };
+  function openDeckPop(side) {
+    if (net.on && net.myCfg) return;
+    let pop = $('#deckPop');
+    if (!pop) { pop = el('div', 'dpop'); pop.id = 'deckPop'; document.body.appendChild(pop); }
+    deckPop.side = side; deckPop.open = true; deckPop.tab = tabOf(DECKS[side.deck]); deckPop.q = '';
+    const close = () => { pop.hidden = true; deckPop.open = false; document.removeEventListener('keydown', esc); };
+    const esc = e => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', esc);
+    pop.onclick = e => { if (e.target === pop) close(); };
+    const keysOf = tab => Object.keys(DECKS).filter(k => tabOf(DECKS[k]) === tab);
+    deckPop.render = () => {
+      const s = deckPop.side, tab = deckPop.tab;
+      pop.innerHTML = '';
+      const bx = el('div', 'dbox'); pop.appendChild(bx);
+      const head = el('div', 'dhead', '<h3>選擇牌組</h3>'); const x = el('button', 'btn ghost small', '關閉'); x.onclick = close; head.appendChild(x); bx.appendChild(head);
+      const tabs = el('div', 'dtabs');
+      for (const [t, name] of DECK_TABS) {
+        const n = keysOf(t).length;
+        const b = el('button', 'dtab', `${name}${t === 'mine' || t === 'shared' ? `<small>${n}</small>` : ''}`); b.setAttribute('aria-selected', t === tab);
+        b.onclick = () => { deckPop.tab = t; deckPop.q = ''; deckPop.render(); }; tabs.appendChild(b);
+      }
+      bx.appendChild(tabs);
+      let keys = keysOf(tab);
+      if ((tab === 'shared' || tab === 'mine') && keys.length > 6) {
+        const q = el('input', 'dsearch'); q.type = 'search'; q.placeholder = '搜尋牌組名稱或編號…'; q.value = deckPop.q;
+        q.oninput = () => { deckPop.q = q.value; const pos = q.selectionStart; deckPop.render(); const nq = pop.querySelector('.dsearch'); nq.focus(); nq.setSelectionRange(pos, pos); };
+        bx.appendChild(q);
+        const t = deckPop.q.trim().toLowerCase(); if (t) keys = keys.filter(k => DECKS[k].label.toLowerCase().includes(t));
+      }
+      const list = el('div', 'dlist');
+      const row = k => {
+        const d = DECKS[k];
+        const b = el('button', 'drow', `<span class="dpname">${d.label}</span><small>${deckSub(d)}</small>${d.desc ? `<span class="ddesc">${d.desc}</span>` : ''}`);
+        b.setAttribute('aria-pressed', s.deck === k);
+        b.onclick = () => {
+          s.deck = k;
+          if (d.leader && (!s.leader || s.leader === 'RANDOM') && LEADERS[d.leader]) { s.leader = d.leader; if (d.leader !== 'L11') delete s.main; }
+          if (s.leader === 'L11' && !s.mainTouched && d.comp) s.main = Object.entries(d.comp).sort((a, b) => b[1] - a[1])[0][0];
+          close(); renderPick();
+        };
+        return b;
+      };
+      if (tab === 'preset') {
+        for (const [tier, title] of [['初階', '初階預組（效果簡單，適合新手）'], ['進階', '進階預組']]) {
+          const ks = keys.filter(k => DECKS[k].tier === tier); if (!ks.length) continue;
+          list.appendChild(el('div', 'dtier', title)); ks.forEach(k => list.appendChild(row(k)));
+        }
+      } else keys.forEach(k => list.appendChild(row(k)));
+      if (!keys.length) list.appendChild(el('div', 'empty', tab === 'mine' ? '還沒有自己的牌組。按下方「＋ 新增牌組」到卡牌構築建立。' : tab === 'shared' ? (deckPop.q ? '找不到符合的牌組。' : '目前沒有其他玩家分享的牌組。') : '沒有牌組。'));
+      bx.appendChild(list);
+      const foot = el('div', 'dfoot');
+      const bl = el('button', 'btn ghost small', '＋ 新增牌組'); bl.onclick = () => { location.href = SHARED_BASE + '../builder/#new'; };
+      const bm = el('button', 'btn ghost small', '管理我的牌組（編輯／刪除）'); bm.onclick = () => { location.href = SHARED_BASE + '../builder/#manage'; };
+      foot.append(bl, bm); bx.appendChild(foot);
+    };
+    deckPop.render(); pop.hidden = false;
+    const sel = pop.querySelector('.drow[aria-pressed="true"]'); if (sel) sel.scrollIntoView({ block: 'center' });
+  }
   function renderPick() {
     const s = cfg[pickStep], isFoe = pickStep === 'foe';
     $('#pickStep').textContent = net.on ? `連線對戰．房間 ${net.code}` : isFoe ? 'STEP 2 / 2' : 'STEP 1 / 2';
@@ -72,7 +137,7 @@
       c.tabIndex = 0; c.setAttribute('role', 'button');
       c.setAttribute('aria-label', id === 'RANDOM' ? '隨機隊長' : `${id} ${LEADERS[id].name}`);
       if (s.leader === id) c.classList.add('chosen');
-      const choose = () => { if (net.on && net.myCfg) return; s.leader = id; if (id !== 'L11') delete s.main; renderPick(); if (innerWidth < 760) $('#pickInfo').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+      const choose = () => { if (net.on && net.myCfg) return; s.leader = id; if (id !== 'L11') delete s.main; renderPick(); if (!s.deck) openDeckPop(s); else if (innerWidth < 760) $('#pickInfo').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
       c.onclick = choose; c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } };
       if (id !== 'RANDOM') tilt(c, 10);
       grid.appendChild(c);
@@ -93,35 +158,18 @@
         inf.appendChild(row);
       }
     }
+    // 牌組：右欄只顯示目前選的牌組，按一下開「選擇牌組」視窗
     inf.appendChild(el('div', 'lab', '牌組'));
-    for (const [tier, title] of [['初階', '初階預組'], ['進階', '進階預組'], ['個人', '個人構築'], ['分享', '玩家分享'], ['其他', '其他']]) {
-      let keys = Object.keys(DECKS).filter(k => (DECKS[k].tier || '其他') === tier);
-      if (!keys.length) continue;
-      // 玩家分享太多時先收合，只顯示最新 6 副（選中的那副一定顯示）
-      const more = tier === '分享' && keys.length > 6 && !showAllShared;
-      if (more) keys = keys.filter((k, i) => i < 6 || k === s.deck);
-      inf.appendChild(el('div', 'dtier', title + (tier === '分享' ? `<small>．${Object.keys(DECKS).filter(k => DECKS[k].tier === '分享').length} 副</small>` : '')));
-      const dk = el('div', 'chips decks');
-      for (const key of keys) {
-        const d = DECKS[key];
-        const sub = d.fixed ? `<small>${d.custom ? '自訂．' : ''}${Object.entries(d.comp).filter(([, v]) => v).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}${d.leader ? `．${LEADERS[d.leader].name}` : ''}</small>` : d.comp ? `<small>${Object.entries(d.comp).map(([k, v]) => `<span class="dot ${k}"></span>${COLOR_NAME[k]}${v}`).join(' ')}</small>` : `<small>全部 ${Object.keys(CARDS).length} 張中隨機 20 張．每屬性最多 ${ATTR_MAX}</small>`;
-        const b = el('button', 'chip', `<span>${d.label}</span>${sub}`); b.setAttribute('aria-pressed', s.deck === key);
-        b.onclick = () => {
-          s.deck = key;
-          if (d.leader && !(net.on && net.myCfg)) { s.leader = d.leader; if (d.leader !== 'L11') delete s.main; }
-          if (s.leader === 'L11' && !s.mainTouched && d.comp) s.main = Object.entries(d.comp).sort((a, b) => b[1] - a[1])[0][0];
-          renderPick();
-        };
-        dk.appendChild(b);
-      }
-      if (more) { const mb = el('button', 'chip', '<span>顯示全部…</span>'); mb.onclick = () => { showAllShared = true; renderPick(); }; dk.appendChild(mb); }
-      inf.appendChild(dk);
+    const cur = DECKS[s.deck];
+    const box = el('button', 'deckpick' + (cur ? ' on' : ''), cur ? `<span class="dpname">${cur.label}</span><small>${deckSub(cur)}</small><em>更換</em>` : `<span class="dpname">選擇牌組…</span><small>預組、我的牌組、玩家分享、隨機</small>`);
+    box.onclick = () => openDeckPop(s);
+    inf.appendChild(box);
+    if (cur && cur.desc) inf.appendChild(el('div', 'desc small', cur.desc));
+    if (cur && cur.leader && LEADERS[cur.leader] && s.leader && s.leader !== cur.leader && !(net.on && net.myCfg)) {
+      const tip = el('div', 'dtip', `這副牌組建議搭配「${LEADERS[cur.leader].name}」 `);
+      const use = el('button', 'btn ghost small', '改用'); use.onclick = () => { s.leader = cur.leader; if (cur.leader !== 'L11') delete s.main; renderPick(); };
+      tip.appendChild(use); inf.appendChild(tip);
     }
-    if (DECKS[s.deck] && DECKS[s.deck].desc) inf.appendChild(el('div', 'desc', DECKS[s.deck].desc));
-    const brow = el('div', 'mrow'); brow.style.justifyContent = 'flex-start';
-    const bl = el('button', 'btn ghost small', '＋ 新增牌組'); bl.onclick = () => { location.href = SHARED_BASE + '../builder/#new'; };
-    const bm = el('button', 'btn ghost small', '管理我的牌組（編輯／刪除）'); bm.onclick = () => { location.href = SHARED_BASE + '../builder/#manage'; };
-    brow.append(bl, bm); inf.appendChild(brow);
     const ok = s.leader && s.deck && (s.leader !== 'L11' || s.main);
     const act = el('div', 'pick-actions');
     const next = el('button', 'btn primary', net.on ? (net.myCfg ? '已準備，等待對手…' : '準備完成') : isFoe ? '確認對手' : '下一步'); next.disabled = !ok || (net.on && !!net.myCfg);
@@ -188,11 +236,11 @@
   const grpOf = n => /^AAAA/.test(n) ? 'g4' : /^AAA/.test(n) ? 'g3' : /^A、AB|無牌型/.test(n) ? 'g1' : 'g2';
   function renderRules() {
     const pw = [['AAAA', '火火火火', 7, '1 張'], ['AAAB', '火火火水', 6, '1 張'], ['AAA', '火火火', 5, '1 張'], ['AABB', '火火水水', 4, '2 張'], ['AAB、AABC', '火火水、火火水草', 3, '1 張'], ['AA', '火火', 2, '1 張'], ['無牌型（雜色）', '火、火水、火水草', 1, '不能']];
-    const words = [['【補牌】', '回合開始的補牌階段。寫「【補牌】：」的效果在補到 5 張後觸發。'], ['【出牌】前', '雙方選牌之前。'], ['【翻牌】前', '雙方翻開出戰牌之前。'],
-      ['【整理】', '回合最後的整理階段，場上其餘卡牌進棄牌區之前。'], ['【多抽】', '補滿 5 張以外，額外從牌庫抽牌；不受 5 張限制。'], ['【換牌】', '棄 1 張手牌，再抽 1 張。'],
+    const words = [['【補牌】', '回合開始的補牌階段。寫「【補牌】：」的效果在補到 5 張後觸發；被「對手抽牌 -1」減少時，手牌最少補到 4 張。'], ['【出牌】前', '雙方選牌之前。'], ['【翻牌】前', '雙方翻開出戰牌之前。'],
+      ['【回合結束】', '回合最後一步，場上其餘卡牌進棄牌區之前。'], ['【多抽】', '補滿 5 張以外，額外從牌庫抽牌；不受 5 張限制。'], ['【換牌】', '棄 1 張手牌，再抽 1 張。'],
       ['【反擊】', '在對手獻祭時回應，讓對手這次獻祭無效。'], ['【啟動】石像', '回合流程第 5 步：把成對那組最左邊的出戰牌變成石像。和石像直立時的「啟動效果」不同。'], ['【我方】／【對方】／【雙方】', '效果觸發的對象範圍。'], ['直立石像', '直放、未獻祭的石像；啟動效果有效。'],
-      ['已獻祭石像', '橫放的石像，沒有任何技能。'], ['出戰牌', '本回合翻開比戰力的牌。'], ['牌型有 AA', 'AA、AAB、AABC、AABB。'], ['牌型有 AAA', 'AAA、AAAB。'], ['雜色', 'AB、ABC。'],
-      ['剋制加成', '剋制成功時的戰力加成，基本 +2。'], ['取回', '從棄牌區選牌加入手牌。'], ['牌庫頂／牌庫底', '牌庫最上面／最下面。'], ['本回合', '到這回合整理階段結束為止；一次性封印例外。'], ['（每回合執行一次）', '同一回合內最多觸發 1 次。']];
+      ['已獻祭石像', '橫放的石像，沒有任何技能。被對手效果打成橫放的也算（但不算對方獻祭）。'], ['出戰牌', '本回合翻開比戰力的牌。'], ['牌型有 AA', 'AA、AAB、AABC、AABB。'], ['牌型有 AAA', 'AAA、AAAB。'], ['雜色', 'AB、ABC。'],
+      ['剋制加成', '剋制成功時的戰力加成，基本 +2。'], ['取回', '從棄牌區選牌加入手牌。'], ['牌庫頂／牌庫底', '牌庫最上面／最下面。'], ['本回合', '到這回合【回合結束】為止；一次性封印例外。'], ['破壞', '石像離場進擁有者的棄牌區。「石像被破壞時：本回合戰力 +1」只在戰力計算前被破壞才有作用。'], ['多啟動 1 張', '從還沒變成石像的出戰牌中，自己選 1 張也變成石像，不看牌型、不限位置。'], ['發動場上石像的獻祭效果', '雙方的直立、未封印石像都可以選（維持 L13 封印的除外），效果由我方獲得，不能選【反擊】。'], ['雙方棄掉全部手牌重抽', '雙方各自棄掉手牌，再抽回相同張數；不算補牌，不受「抽牌 -1」影響。'], ['（每回合執行一次）', '同一回合內最多觸發 1 次。']];
     const cc = cards => { const c = { F: 0, W: 0, G: 0 }; cards.forEach(id => c[id[0]]++); return `火 ${c.F}．水 ${c.W}．草 ${c.G}`; };
     $('#rulesBody').innerHTML = `
 <h3>怎麼贏</h3>
@@ -202,11 +250,11 @@
 <ul><li><b>構築</b>：每人組合 20 張卡牌（一種屬性最多 8 張，編號不得重複）和 1 位隊長。</li>
 <li><b>設置</b>：挑選 1 位隊長，洗牌後各抽 5 張。猜拳決定第一回合的起始玩家，之後每回合輪流當起始玩家。</li></ul>
 <h3>回合流程</h3>
-<ol><li><b>補牌</b>：手牌補到 5 張，再處理石像【補牌】的效果，例如【多抽】、【換牌】。</li>
+<ol><li><b>補牌</b>：手牌補到 5 張，再處理石像【補牌】的效果，例如【多抽】、【換牌】。被「對手抽牌 -1」減少時，手牌最少補到 4 張。</li>
 <li><b>出牌</b>：雙方同時選 1～4 張排好順序，蓋著出。</li><li><b>翻牌</b>：雙方同時翻開。</li>
 <li><b>戰力計算</b>：計算牌型戰力、石像與隊長加成、屬性剋制，戰力高的人得 1 分；平手都不得分。</li>
 <li><b>【啟動】石像</b>：不論輸贏，出了成對以上的牌型，就把其中 1 張變成石像（AABB 2 張）。</li>
-<li><b>整理</b>：處理石像【整理】的效果，場地上的其餘卡牌進入棄牌區。</li></ol>
+<li><b>回合結束</b>：處理石像【回合結束】的效果，場地上的其餘卡牌進入棄牌區。</li></ol>
 <div class="box"><b>獻祭</b>：可於補牌後～戰力計算之間發動，獻祭 1 座自己的石像，發動它的獻祭效果。每人每回合最多 1 次。</div>
 <h3>石像</h3>
 <ul><li>每張石像有兩個技能：<b>啟動</b>是石像直立期間一直有效；<b>獻祭</b>是把石像橫放，換一次效果。</li>
@@ -216,16 +264,16 @@
 <div class="tbl"><table><tr><th>牌型</th><th>例子</th><th>戰力</th><th>變成石像</th></tr>${pw.map(r => `<tr><td class="${grpOf(r[0])}">${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}</table></div>
 <p><b>剋制</b>：<span class="F">火</span>剋<span class="G">草</span>、<span class="G">草</span>剋<span class="W">水</span>、<span class="W">水</span>剋<span class="F">火</span>。不限牌型，每回合都比較雙方的核心屬性，剋制的一方戰力 +2。</p>
 <details><summary>詳細規則</summary>
-<h4>1. 抽牌與牌庫</h4><ul><li>沒用完的手牌會留著，補牌時補到 5 張。</li><li>牌庫抽完時，把棄牌區洗成新牌庫繼續抽。石像區的牌不洗回。</li></ul>
+<h4>1. 抽牌與牌庫</h4><ul><li>沒用完的手牌會留著，補牌時補到 5 張。被「對手抽牌 -1」減少時（可以疊加，也會減少補牌時的【多抽】），最少還是補到 4 張。</li><li>牌庫抽完時，把棄牌區洗成新牌庫繼續抽。石像區的牌不洗回。</li></ul>
 <h4>2. 核心屬性與剋制</h4><ul><li><b>核心屬性</b>：重複最多的屬性，例如火火水草 → 火。AABB 和無牌型（雜色）看最左邊那張，例如火火水水 → 火、草火水 → 草。</li><li><b>剋制不限牌型</b>：每回合都比較雙方的核心屬性，例如 AA 的火對上 AAA 的草，火方照樣 +2。</li></ul>
 <h4>3. 【啟動】哪一張</h4><ul><li>只能從成對的那組牌中【啟動】，固定取最左邊那張。AABB 時，兩組各取最左邊那張。</li><li>出牌時點選的順序就是由左到右的排列，會決定核心屬性和哪一張變成石像。</li><li>無牌型不能【啟動】，卡上另有寫明的除外。</li></ul>
 <h4>4. 獻祭的順序</h4><ul><li><b>【反擊】</b>：對手獻祭時才能發動，讓對手這次獻祭無效。</li><li><b>本回合對手不能獻祭</b>：主動發動；對手可以用【反擊】回應。</li><li><b>翻牌前</b>才能發動的獻祭：宣告核心屬性、看對手出戰牌。看對手出戰牌要在對手已出牌、自己還沒出牌時才看得到。</li></ul>
 <ol><li>翻牌前（補牌後、出牌時）雙方隨時可以獻祭；翻牌後進入獻祭時間，畫面會顯示雙方目前戰力。</li><li>獻祭時間從起始玩家開始，雙方輪流宣告「獻祭」或「跳過」。</li><li>跳過不代表放棄，對手之後獻祭時，你還是可以【反擊】。</li><li>雙方連續都跳過，獻祭時間就結束。</li></ol>
 <h4>5. 石像的狀態與封印</h4><div class="tbl"><table><tr><th>狀態</th><th>擺法</th><th>技能</th><th>算進屬性數量</th></tr><tr><td>直立</td><td>直放</td><td>啟動有效，可以獻祭</td><td>算</td></tr><tr><td>已獻祭</td><td>橫放</td><td>沒有任何技能</td><td>不算（只算獻祭數量）</td></tr><tr><td>封印中</td><td>直放</td><td>啟動無效，也不能獻祭</td><td>算</td></tr></table></div>
 <ul><li><b>破壞</b>：被破壞的石像進擁有者的棄牌區，之後會洗回牌庫。</li><li><b>封印通則</b>：封印讓對手有優勢的能力失效；累積的數值保留不變。</li>
-<li><b>一次性封印</b>（獻祭效果，例如「本回合對手隊長效果無效」）：【戰力計算】完畢後、【啟動】石像之前解除。所以 L01 被封印的回合沒有連勝加成，但贏了照樣 +1、輸了照樣歸零；【啟動】石像後的隊長勝利條件、整理階段的能力也照常。</li>
+<li><b>一次性封印</b>（獻祭效果，例如「本回合對手隊長效果無效」）：【戰力計算】完畢後、【啟動】石像之前解除。所以 L01 被封印的回合沒有連勝加成，但贏了照樣 +1、輸了照樣歸零；【啟動】石像後的隊長勝利條件、【回合結束】的能力也照常。</li>
 <li><b>持續封印</b>（L13 雙界封印，以及之後的啟動效果封印）：選定後綁定，直到我方負責維持的石像或對手被封印的石像其中一座被破壞才解除。我方維持者啟動照常、但不能獻祭；對手被封印者啟動無效、也不能獻祭。</li></ul>
-<h4>6. 效果處理</h4><ul><li>寫【補牌】的啟動效果在補牌後處理，寫【整理】的在整理階段處理。雙方同時觸發時，起始玩家先處理。</li><li>獻祭得到的能力只持續本回合。</li><li>卡面不加括號說明，範圍細節以「用詞定義」為準。</li></ul>
+<h4>6. 效果處理與次數</h4><ul><li>寫【補牌】的啟動效果在補牌後處理，寫【回合結束】的在回合最後處理。雙方同時觸發時，起始玩家先處理。</li><li><b>啟動效果</b>：石像直立期間一直有效，條件每次達成就發動；同樣效果的石像各自發動、可以疊加（例如 2 座看手牌的石像，各看 2 張）。標「（每回合執行一次）」的，同一座每回合最多 1 次。</li><li><b>獻祭效果</b>：每人每回合最多獻祭 1 座，【反擊】也算這 1 次。</li><li><b>隊長能力</b>：一直有效，被封印的回合無效。</li><li>獻祭得到的能力只持續本回合。</li><li>卡面不加括號說明，範圍細節以「用詞定義」為準。</li></ul>
 <h4>7. 勝利的細節</h4><ul><li>隊長的特殊勝利條件一達成，就立刻獲勝。</li><li>需要指定顏色才能獲勝的隊長（L11 冥火貓妖），開局要<b>宣告</b>主色是哪個屬性，雙方都看得到。</li><li>雙方同時達成勝利條件時，進入搶 1 分加賽。</li></ul>
 </details>
 <details><summary>用詞定義</summary>
@@ -235,7 +283,7 @@
 <details><summary>隊長</summary>
 <div class="tbl"><table><tr><th>隊長</th><th>屬性．種族</th><th>能力</th></tr>${leaderIds.map(id => { const L = LEADERS[id]; return `<tr><td class="rk">${id} ${L.name}</td><td>${COLOR_NAME[L.color]}．${L.race}</td><td><b>${L.skill}</b>　${L.text}</td></tr>`; }).join('')}</table></div>
 <ul class="rnote"><li>L06「牌型為 AA」：AA、AAB、AABC、AABB 都算，都只 +1。</li><li>L12 專屬戰力：A、AA、AAA、AAAA＝1；AB、AAB、AAAB＝3；AABB＝4；ABC＝5；AABC＝6。L12 的屬性一律看最左一張（不管牌型），可以剋制對手，也會被剋制。</li>
-<li>L13：整理階段，每 2 座自己的同屬性直立石像（還沒在維持封印的）可以封印 1 座對手直立石像；選定後固定，之後只能用新的成對石像追加。維持的 2 座不能獻祭；維持或被封印的石像被破壞就解除；封魔者被封印時暫時失效到判定勝負。同時封印 4 座獲勝。</li></ul>
+<li>L13：【回合結束】時，每 2 座自己的同屬性直立石像（還沒在維持封印的）可以封印 1 座對手直立石像；選定後固定，之後只能用新的成對石像追加。維持的 2 座不能獻祭；維持或被封印的石像被破壞就解除；封魔者被封印時暫時失效到判定勝負。同時封印 4 座獲勝。</li></ul>
 </details>
 <details><summary>預組</summary>
 <p class="rnote">初階 1～3、進階 4～11；個人牌組在卡牌構築頁建立，編號從 12 接著排。</p>
@@ -366,7 +414,7 @@
     logs.push({ text, who, turn: G ? G.turn : 0, t: Date.now() - t0 }); }
 
   // ---------- 繪製 ----------
-  const PHASE = { setup: '準備', draw: '補牌', choose: '出牌', reveal: '翻牌', post: '獻祭時間', settle: '戰力計算', summon: '【啟動】石像', end: '整理' };
+  const PHASE = { setup: '準備', draw: '補牌', choose: '出牌', reveal: '翻牌', post: '獻祭時間', settle: '戰力計算', summon: '【啟動】石像', end: '回合結束' };
   function renderAll() {
     if (!G) return;
     $('#tip').hidden = true;
@@ -756,12 +804,12 @@
     const m = $('#modal'), b = $('#mbox'); b.innerHTML = '';
     b.appendChild(el('h3', '', '規則速覽'));
     b.appendChild(el('div', 'logbox', `<p><b>怎麼贏</b>：先拿 4 分；或達成隊長的特殊勝利條件。</p>
-<p><b>1 補牌</b>：手牌補到 5 張，處理石像【補牌】效果。</p>
+<p><b>1 補牌</b>：手牌補到 5 張（被減少時最少 4 張），處理石像【補牌】效果。</p>
 <p><b>2 出牌</b>：雙方同時選 1～4 張，點選順序＝由左到右。</p>
 <p><b>3 翻牌</b>：雙方同時翻開。</p>
 <p><b>4 戰力計算</b>：牌型戰力＋石像＋隊長＋剋制，高的人得 1 分，平手都不得分。</p>
 <p><b>5 【啟動】石像</b>：不論輸贏，成對的那組最左邊 1 張變石像（AABB 2 張）。</p>
-<p><b>6 整理</b>：處理【整理】效果，其餘出戰牌進棄牌區。</p>
+<p><b>6 回合結束</b>：處理【回合結束】效果，其餘出戰牌進棄牌區。</p>
 <p><b>獻祭</b>：補牌後到戰力計算前，每回合可以獻祭 1 座石像，發動它的獻祭效果；獻祭後橫放在獻祭區。翻牌後雙方輪流宣告獻祭或跳過，畫面會顯示目前戰力。</p>
 <p><b>核心屬性</b>：重複最多的屬性；AABB 和無牌型（雜色）看最左邊那張。</p>
 <p><b>剋制</b>：火剋草、草剋水、水剋火，不限牌型，剋制方 +2。</p>`));

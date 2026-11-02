@@ -18,8 +18,9 @@ TXT_FONT = ImageFont.truetype(f'{FD}/NotoSansCJK-Bold.ttc', int(os.environ.get('
 NUM_FONT = ImageFont.truetype(f'{FD}/NotoSerifCJK-Medium.ttc', int(os.environ.get('NUM', 46)), index=3)
 INK = (28, 22, 16)
 NUM_BOX = (236, 46, 364, 94)          # 卡號文字（含兩側裝飾線的內段，之後補畫回去）
-BOXES = ((180, 571, 549, 651), (180, 673, 549, 773))   # 啟動、獻祭 文字區
-TX, MAXW, LH = 186, 360, 30
+BOXES = ((180, 565, 549, 652), (180, 671, 549, 773))   # 啟動、獻祭 文字區
+TX, MAXW = 186, 360
+LH = int(TXT_FONT.size * 1.28)
 
 # 舊卡的種族（找火改草這類卡的底圖用）
 src = open(f'{REPO}/shared/data.js', encoding='utf-8').read()
@@ -93,7 +94,7 @@ for r in rows:
     report.append((nid, base, max(len(l) for l in lines)))
     print(nid, '←', base, '|', ' / '.join('｜'.join(l) for l in lines))
 over = [x for x in report if x[2] > 3]
-print('超過 3 行：', over or '無')
+print('最多行數：', max(x[2] for x in report), '｜超過 3 行：', over or '無')
 
 # A4 3×3 PDF
 from reportlab.pdfgen import canvas

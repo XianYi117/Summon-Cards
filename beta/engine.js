@@ -1,4 +1,4 @@
-// 召喚 vj.1030.0 對戰引擎（規則＋電腦 AI）
+// 召喚 vj.1102 對戰引擎（規則＋電腦 AI）
 // 卡牌效果依 data.js 的代號實作：fa＝啟動效果、fs＝獻祭效果
 (function (root) {
   let UID = 1;
@@ -52,6 +52,7 @@
     stF: .7, stW: .7, stG: .7, sac2: .6, fewer2: .7, behind2: .7, lost1: .5, sacced1: .5, destroyed1: .3, oppM1: 1, oppSac3: .3,
     cPlus2: .8, cPunish: .5, cRecall: .5, cDiscard: .5, leftCore: .3, peekHand: .4, peekPlay1: .4, mixSummon: .4,
     cutDraw: .4, oppCap: .9, drawPlus1: .9, drawSwap: .6, drawRetrieve: .6, drawScry: .5, drawLost: .5, drawTie: .3, drawBehind: .5,
+    drawCut: .7, oppSac2: .4, oppSacced1: .5, endUpright: .6, onMyBrokenP1: .3,
     onMySac: .5, onOppSac: .5, endHandBottom: .2, endSacBack: .3, endDiscBottom: .3, onOppBroken: .3, onMyBroken2: .5, onAnyBroken: .4, onMyBrokenRet: .4,
   };
   const SAC_VAL = {
@@ -59,10 +60,12 @@
     tutor: .6, top3: .6, retrieve2: .6, copy: .6, actOff: .6, sealLeader: .6, setCore: .6, recolor: .6, peek2: .3, peekPlay2: .4,
     oppBottom: .5, oppRandDiscard: .5, swapTop: .3, discBack2: .2, statueToHand: .4, mySacToHand: .5, mySacUp: .6, mySacToDisc: .2,
     mySacToDeck: .3, oppSacToDisc: .4, bothSacToDisc: .3, oppSacUp: .1, noop: 0,
+    knockDown: .7, extraSummon: .6, mulligan: .3, tieWin: .5, handStatue: .6,
   };
   const aval = id => ACT_VAL[FA(id)] || .3;
   const cval = id => aval(id) + .5 * (SAC_VAL[FS(id)] || .3);
   const PRE_ONLY = ['setCore', 'peekPlay2']; // 翻牌前才能發動
+  const MIN_HAND = 4; // 補牌被減少時，手牌最少補到 4 張
   const NO_COPY = ['copy', 'counter'];
 
   function buildDeck(type) {
@@ -182,6 +185,8 @@
       const myBroken2 = this.fx(o, 'onMyBroken2');
       const myRet = this.fx(o, 'onMyBrokenRet');
       const anyO = this.fx(o, 'onAnyBroken');
+      const p1 = this.fx(o, 'onMyBrokenP1');
+      if (p1 && this.ctx && ['draw', 'choose', 'reveal', 'post'].includes(this.phase)) { this.ctx.bonus[own] += p1; this.note(`石像被破壞：本回合戰力 +${p1}`, own); }
       if (!this.removeStatue(own, target)) return;
       o.disc.push({ uid: target.uid, id: target.id });
       p.destroyedOpp = true;
@@ -200,8 +205,15 @@
       const order = [this.first, 1 - this.first];
       for (const i of order) {
         const p = this.p[i], o = this.opp(i);
-        const cap = Math.max(1, (this.lead(p, 'L09') ? 6 : 5) - this.fx(o, 'oppCap'));
-        if (p.hand.length < cap) await this.draw(i, cap - p.hand.length);
+        const cap = this.lead(p, 'L09') ? 6 : 5;
+        // 對手的「【補牌】：對手抽牌 -1」：每座每回合扣 1 張（含補牌時的【多抽】），但手牌最少補到 4 張
+        p._cut = this.fx(o, 'drawCut');
+        if (p.hand.length < cap) {
+          const need = cap - p.hand.length, keep = Math.max(0, MIN_HAND - p.hand.length);
+          const cut = Math.min(p._cut, Math.max(0, need - keep)); p._cut -= cut;
+          if (cut) this.note(`補牌被對手減少 ${cut} 張（最少補到 ${MIN_HAND} 張）`, i);
+          if (need - cut > 0) await this.draw(i, need - cut);
+        }
         // L02 潮汐交換：補牌後，0～2 張手牌放回牌庫底，再補滿手牌
         if (this.lead(p, 'L02') && p.hand.length) {
           const back = ((await this.ctrl[i].pick(this, i, 'l02', { cards: p.hand.slice(), n: 2, title: 'L02 潮汐交換：選 0～2 張手牌放回牌庫底，再補滿手牌' })) || []).filter(c => p.hand.includes(c)).slice(0, 2);
@@ -219,6 +231,7 @@
           + (p.lastRes === 'lose' ? this.fx(p, 'drawLost') : 0)
           + (p.lastRes === 'tie' ? this.fx(p, 'drawTie') : 0)
           + (p.score < o.score ? this.fx(p, 'drawBehind') : 0);
+        if (k && p._cut) { const c = Math.min(k, p._cut); p._cut -= c; k -= c; this.note(`【補牌】【多抽】被對手減少 ${c} 張`, i); }
         if (k) { this.note(`【補牌】【多抽】${k} 張`, i); await this.extraDraw(i, k); }
         for (let n = this.fx(p, 'drawSwap'); n > 0; n--) {
           if (!p.hand.length) break;
@@ -363,6 +376,8 @@
       for (const s of this.active(o)) {
         if (FA(s.id) === 'oppM1') add(`對手 ${s.id}`, -1);
         else if (FA(s.id) === 'oppSac3') add(`對手 ${s.id}`, -Math.floor(sacP / 3));
+        else if (FA(s.id) === 'oppSac2') add(`對手 ${s.id}`, -Math.floor(sacP / 2));
+        else if (FA(s.id) === 'oppSacced1' && p.sacThisTurn) add(`對手 ${s.id}`, -1);
       }
       add('獻祭加成', ctx.bonus[i]);
       if (ctx.minus) add('對手獻祭', -ctx.minus[i]);
@@ -389,8 +404,8 @@
         x.br.push(['屬性剋制', 2]); x.total += 2;
         const c2 = 2 * this.fx(p, 'cPlus2'); if (c2) { x.br.push(['剋制成功', c2]); x.total += c2; }
         const cb = (ctx.cbonus || [0, 0])[i]; if (cb) { x.br.push(['剋制加成', cb]); x.total += cb; }
-        // 被剋制的一方：「屬性被對手剋制時對手戰力 -1」
-        const pun = this.fx(this.p[j], 'cPunish'); if (pun) { x.br.push(['被剋方反制', -pun]); x.total -= pun; }
+        // 被剋制的一方：「屬性被對手剋制時對手戰力 -2」
+        const pun = 2 * this.fx(this.p[j], 'cPunish'); if (pun) { x.br.push(['被剋方反制', -pun]); x.total -= pun; }
       }
       const pw = r.map(x => x.total);
       const w = pw[0] > pw[1] ? 0 : pw[1] > pw[0] ? 1 : null;
@@ -460,8 +475,9 @@
           break;
         }
         case 'copy': {
-          const tg = p.statues.filter(s => s.up && !s.sealed && s !== src && !NO_COPY.includes(FS(s.id)) && (this.phase === 'choose' || !PRE_ONLY.includes(FS(s.id))));
-          const t = await this.pickStatue(i, tg, '選擇要發動獻祭效果的我方石像（不獻祭它）', 'copy');
+          const okS = s => s.up && !s.sealed && !s.maint && s !== src && !NO_COPY.includes(FS(s.id)) && (this.phase === 'choose' || !PRE_ONLY.includes(FS(s.id)));
+          const tg = [...p.statues, ...o.statues].filter(okS);
+          const t = await this.pickStatue(i, tg, '選擇場上 1 座石像，發動它的獻祭效果（不獻祭它）', 'copy');
           if (t) { this.note(`發動 ${t.id} 的獻祭效果：${CARDS[t.id].sac}`, i); await this.resolve(i, FS(t.id), phase, t); }
           break;
         }
@@ -568,6 +584,32 @@
           this.note(`讓對手隨機棄掉 ${c.id}`, i); await this.ui.ev('discard', { i: j, cards: [c] });
         } break;
         case 'noop': this.note('剋制已不限牌型，這個效果沒有額外作用', i); break;
+        case 'knockDown': {
+          const t = await this.pickStatue(i, this.upright(o), '選擇對手 1 座直立石像橫放（不發動效果）', 'destroy'); if (!t) break;
+          t.up = false; this.releaseL13();
+          this.note(`把對手的 ${t.id} 橫放（視為已獻祭）`, i); await this.ui.ev('statueMove', { i });
+          break;
+        }
+        case 'extraSummon': ctx.extraSummon[i] += 1; this.note('本回合【啟動】石像時，多啟動 1 張', i); break;
+        case 'tieWin': ctx.tieWin[i] = true; this.note('本回合平手時，我方獲勝', i); break;
+        case 'mulligan': {
+          for (const k of [i, j]) {
+            const q = this.p[k], n = q.hand.length; if (!n) continue;
+            const old = q.hand.splice(0); q.disc.push(...old); await this.ui.ev('discard', { i: k, cards: old });
+            await this.draw(k, n);
+          }
+          this.note('雙方棄掉全部手牌，各自重抽相同張數', i); break;
+        }
+        case 'handStatue': {
+          if (!p.hand.length) break;
+          const [c] = (await this.ctrl[i].pick(this, i, 'tutor', { cards: p.hand.slice(), n: 1, title: '選 1 張手牌啟動為石像' })) || [];
+          const x = p.hand.includes(c) ? c : p.hand[0];
+          p.hand.splice(p.hand.indexOf(x), 1); delete x.as;
+          const ns = { uid: x.uid, id: x.id, up: true, sealed: false }; p.statues.push(ns);
+          this.note(`手牌 ${x.id} 啟動為石像`, i); await this.ui.ev('summon', { i, statues: [ns], rest: [] });
+          this.checkAlt();
+          break;
+        }
       }
     }
 
@@ -585,7 +627,7 @@
       this.p.forEach(p => { p.sacUsed = false; p.lsealed = false; p.peeked = []; p.peekedPlay = []; p.wantPeek = 0; p.sacThisTurn = false; p.destroyedOpp = false; });
       this.actOff = false; this.locked = [null, null]; this._wait = [null, null];
       this.syncL13();
-      this.ctx = { core: [null, null], cat: [null, null], bonus: [0, 0], minus: [0, 0], cbonus: [0, 0], coreSet: [null, null], immune: [false, false], blocked: [false, false], extraPt: [false, false] };
+      this.ctx = { core: [null, null], cat: [null, null], bonus: [0, 0], minus: [0, 0], cbonus: [0, 0], coreSet: [null, null], immune: [false, false], blocked: [false, false], extraPt: [false, false], extraSummon: [0, 0], tieWin: [false, false] };
       this.played = [[], []];
       this.phase = 'draw';
       await this.ui.ev('turnStart', { turn: this.turn, first: this.first });
@@ -627,6 +669,8 @@
       // 戰力計算
       this.phase = 'settle';
       const ev = this.evaluate(this.played, this.ctx, true);
+      // 「本回合平手時，我方獲勝」：只有一方有時才生效
+      if (ev.w === null && this.ctx.tieWin[0] !== this.ctx.tieWin[1]) { ev.w = this.ctx.tieWin[0] ? 0 : 1; this.note('平手：本回合平手時獲勝的效果生效', ev.w); }
       let gain = 0;
       if (ev.w !== null) {
         const p = this.p[ev.w]; gain = this.ctx.extraPt[ev.w] ? 2 : 1;
@@ -657,6 +701,12 @@
         const p = this.p[i], cards = this.played[i];
         const [, cat] = shape(cards);
         const sm = summonList(cards, cat, this.lead(p, 'L12') || this.fx(p, 'mixSummon') > 0);
+        // 「多啟動 1 張」：從剩下的出戰牌自己選
+        for (let n = this.ctx.extraSummon[i]; n > 0; n--) {
+          const rest = cards.filter(c => !sm.includes(c)); if (!rest.length) break;
+          const [c] = (await this.ctrl[i].pick(this, i, 'tutor', { cards: rest, n: 1, title: '多啟動 1 張：從出戰牌選 1 張也變成石像' })) || [];
+          sm.push(rest.includes(c) ? c : rest[0]);
+        }
         const newS = sm.map(c => ({ uid: c.uid, id: c.id, up: true, sealed: false }));
         p.statues.push(...newS);
         for (const c of cards) { delete c.as; if (!sm.includes(c)) p.disc.push(c); }
@@ -676,24 +726,29 @@
         }
       }
       this.p.forEach(p => [...p.hand, ...p.disc, ...p.deck].forEach(c => { delete c.as; }));
-      // 整理
+      // 回合結束
       this.phase = 'end';
       for (const i of order) {
         const p = this.p[i];
         for (let n = this.fx(p, 'endHandBottom'); n > 0 && p.hand.length; n--) {
-          const [c] = (await this.ctrl[i].pick(this, i, 'handBottom', { cards: p.hand.slice(), n: 1, title: '【整理】：選 1 張手牌放到牌庫底' })) || [];
+          const [c] = (await this.ctrl[i].pick(this, i, 'handBottom', { cards: p.hand.slice(), n: 1, title: '【回合結束】：選 1 張手牌放到牌庫底' })) || [];
           const x = p.hand.includes(c) ? c : p.hand[0]; p.hand.splice(p.hand.indexOf(x), 1); p.deck.unshift(x);
-          this.note('【整理】手牌 1 張放到牌庫底', i);
+          this.note('【回合結束】手牌 1 張放到牌庫底', i);
         }
         for (let n = this.fx(p, 'endSacBack'); n > 0; n--) {
-          const t = await this.pickStatue(i, this.sacked(p), '【整理】：選我方 1 座已獻祭石像洗回牌庫', 'mySacToDeck'); if (!t) break;
+          const t = await this.pickStatue(i, this.sacked(p), '【回合結束】：選我方 1 座已獻祭石像洗回牌庫', 'mySacToDeck'); if (!t) break;
           this.removeStatue(i, t); p.deck.push({ uid: t.uid, id: t.id }); shuffle(p.deck);
-          this.note(`【整理】已獻祭石像 ${t.id} 洗回牌庫`, i); await this.ui.ev('statueMove', { i });
+          this.note(`【回合結束】已獻祭石像 ${t.id} 洗回牌庫`, i); await this.ui.ev('statueMove', { i });
+        }
+        for (let n = this.fx(p, 'endUpright'); n > 0; n--) {
+          const t = await this.pickStatue(i, this.sacked(p), '【回合結束】：選我方 1 座已獻祭石像重新直立', 'mySacUp'); if (!t) break;
+          t.up = true; t.sealed = false;
+          this.note(`【回合結束】已獻祭石像 ${t.id} 重新直立`, i); await this.ui.ev('statueMove', { i });
         }
         for (let n = this.fx(p, 'endDiscBottom'); n > 0 && p.disc.length; n--) {
-          const [c] = (await this.ctrl[i].pick(this, i, 'discBottom', { cards: p.disc.slice(), n: 1, title: '【整理】：選棄牌區 1 張放回牌庫底' })) || [];
+          const [c] = (await this.ctrl[i].pick(this, i, 'discBottom', { cards: p.disc.slice(), n: 1, title: '【回合結束】：選棄牌區 1 張放回牌庫底' })) || [];
           const x = p.disc.includes(c) ? c : p.disc[0]; p.disc.splice(p.disc.indexOf(x), 1); p.deck.unshift(x);
-          this.note(`【整理】${x.id} 放回牌庫底`, i);
+          this.note(`【回合結束】${x.id} 放回牌庫底`, i);
         }
       }
       await this.l13Cleanup();
@@ -835,7 +890,7 @@
     },
     targetValue(g, i, s) {
       const opp = g.opp(i);
-      return aval(s.id) * (s.sealed ? 0 : 1) + (opp.leader === 'L11' && s.id[0] === opp.main ? 1.5 : 0) + (opp.leader === 'L10' ? .8 : 0) + (opp.leader === 'L13' ? .4 : 0) + (s.maint ? 1.2 : 0) - (['onMyBroken2', 'onMyBrokenRet', 'onAnyBroken'].includes(FA(s.id)) ? .4 : 0);
+      return aval(s.id) * (s.sealed ? 0 : 1) + (opp.leader === 'L11' && s.id[0] === opp.main ? 1.5 : 0) + (opp.leader === 'L10' ? .8 : 0) + (opp.leader === 'L13' ? .4 : 0) + (s.maint ? 1.2 : 0) - (['onMyBroken2', 'onMyBrokenRet', 'onAnyBroken', 'onMyBrokenP1'].includes(FA(s.id)) ? .4 : 0);
     },
     predictCore(g, i) {
       const cnt = {}; for (const s of AI.oppSamples(g, i, 8)) cnt[s.core] = (cnt[s.core] || 0) + 1;
@@ -860,6 +915,9 @@
       const maxSame = Math.max(0, ...Object.values(cnt));
       let st = null;
       if (!st && by('destroy') && g.upright(o).length && (threat || bestTarget >= 1.2)) st = by('destroy');
+      if (!st && by('knockDown') && g.upright(o).length && (threat || bestTarget >= 1.2)) st = by('knockDown');
+      if (!st && by('handStatue') && p.hand.length >= 4 && (ALT_LEADERS.includes(p.leader) || g.upright(p).length < 3)) st = by('handStatue');
+      if (!st && by('mulligan') && maxSame <= 1 && o.hand.length >= 4) st = by('mulligan');
       if (!st && by('block') && (threat || Math.max(0, ...oppSac) >= .8)) st = by('block');
       if (!st && by('sealLeader') && AI.leaderThreat(g, 1 - i) >= 2) st = by('sealLeader');
       if (!st && by('setCore') && AI.predictCore(g, i)) st = by('setCore');
@@ -885,6 +943,7 @@
         case 'actOff': { const was = g.actOff; g.actOff = true; undo.push(() => { g.actOff = was; }); break; }
         case 'sealLeader': { const was = o.lsealed; o.lsealed = true; undo.push(() => { o.lsealed = was; }); break; }
         case 'recolor': return AI.bestG08(g, i) ? { w: i } : null;
+        case 'tieWin': { const e0 = g.evaluate(g.played, ctx); return e0.w === null && !ctx.tieWin[1 - i] ? { w: i, pw: e0.pw } : null; }
         case 'copy': {
           for (const t of g.p[i].statues.filter(s => s.up && !s.sealed && s !== st && !NO_COPY.includes(FS(s.id)))) {
             const e = AI.simulate(g, i, FS(t.id), t); if (e && e.w === i) { AI._copy = t; return e; }
@@ -910,6 +969,8 @@
         if (by('extraPt')) return by('extraPt');
         if (ev.pw[i] - ev.pw[1 - i] <= 2 && g.canSacList(1 - i).length && by('block')) return by('block');
         if (by('destroy') && AI.threat(g, 1 - i)) return by('destroy');
+        if (by('knockDown') && AI.threat(g, 1 - i)) return by('knockDown');
+        if (by('extraSummon') && ALT_LEADERS.includes(p.leader) && g.played[i].length >= 2) return by('extraSummon');
         if (p.leader === 'L08' && g.lead(p, 'L08')) return opts.slice().sort((a, b) => cval(a.id) - cval(b.id))[0] || null;
         return null;
       }
@@ -924,6 +985,8 @@
       }
       if (tieSave) return tieSave;
       if (by('destroy') && g.upright(o).length) return by('destroy');
+      if (by('knockDown') && g.upright(o).length) return by('knockDown');
+      if (by('extraSummon') && g.played[i].length >= 2) return by('extraSummon');
       if (by('oppSacToDisc') && o.leader === 'L08' && g.sacked(o).length >= 3) return by('oppSacToDisc');
       if (p.hand.length <= 2) for (const k of ['draw2', 'retrieve2', 'top3', 'tutor']) if (by(k)) return by(k);
       if (p.leader === 'L08' && g.lead(p, 'L08')) return cands[0] || null;
@@ -931,7 +994,7 @@
     },
     async respondCounter(g, j, effId, opts) {
       const k = FS(effId);
-      const imp = ['destroy', 'extraPt', 'block', 'sealLeader', 'actOff', 'mySacUp', 'oppSacToDisc'].includes(k) || (g.phase === 'post' && ['plus2', 'plus1draw1', 'oppMinus2', 'immune', 'counterPlus2', 'recolor', 'copy'].includes(k));
+      const imp = ['destroy', 'knockDown', 'tieWin', 'extraPt', 'block', 'sealLeader', 'actOff', 'mySacUp', 'oppSacToDisc'].includes(k) || (g.phase === 'post' && ['plus2', 'plus1draw1', 'oppMinus2', 'immune', 'counterPlus2', 'recolor', 'copy'].includes(k));
       return imp ? opts[0] : null;
     },
     bestG08(g, i) {
