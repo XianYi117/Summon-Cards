@@ -221,8 +221,8 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .detail .row{font-size:16px;line-height:1.5}
 .detail .row b{display:inline-block;color:var(--gold-hi);margin-right:6px}
 .detail .hint{font-size:12px;color:var(--muted);line-height:1.6}
-.side{position:absolute;right:14px;width:216px;display:grid;gap:8px}
-.side.foe{top:14px}.side.me{bottom:14px}
+.side{width:216px;display:grid;gap:8px;flex:none}
+.side.me{margin-top:auto}
 .pl{display:grid;grid-template-columns:76px 1fr;gap:10px;align-items:center;background:#11151c;border:1px solid var(--line);border-radius:8px;padding:8px}
 .pl .card{--w:76px;cursor:help}
 .pl .pn{font-family:var(--f-display);font-weight:900;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}
@@ -231,10 +231,10 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .pl .ps b{color:var(--text);font-variant-numeric:tabular-nums}
 .pl .goal{font-size:12px;color:var(--gold-hi)}
 .pl.sealedL .card .shade{background:#3a1f6a88}
-.rcol{position:absolute;right:14px;top:150px;bottom:160px;width:216px;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.rcol{position:absolute;right:14px;top:14px;bottom:14px;width:216px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .rcol>*{pointer-events:auto}
 .turnbox{position:relative;display:grid;gap:5px;justify-items:center;text-align:center;flex:none}
-.netstate{position:absolute;top:-16px;left:0;right:0}
+.netstate{font-size:12px;color:var(--muted)}
 .phase{font-family:var(--f-display);font-weight:900;font-size:18px;letter-spacing:.1em;color:var(--gold-hi)}
 .turnno{font-size:12px;color:var(--muted);letter-spacing:.2em}
 .tools{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;width:100%}.tools .btn{padding-left:0;padding-right:0;min-width:0}
@@ -300,7 +300,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .foe-hand.open{top:4px}.foe-hand.open .card{--w:64px;margin:0 2px}
 .hand .card .astag{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);z-index:3;padding:1px 8px;border-radius:9px;color:#fff;font-size:12px;font-weight:700}
 .astag.F{background:var(--fire)}.astag.W{background:var(--water)}.astag.G{background:var(--grass)}
-.cheat{position:relative;flex:none;box-sizing:border-box;width:100%;overflow:hidden;background:#11151c;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px}
+.cheat{position:relative;flex:0 1 auto;min-height:0;box-sizing:border-box;width:100%;overflow:hidden;background:#11151c;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px}
 .cheat h4{flex-wrap:wrap;gap:0 6px;margin:0 0 4px;font-family:var(--f-display);font-size:13px;color:var(--gold-hi);letter-spacing:.1em;display:flex;justify-content:space-between;align-items:center}
 .cheat h4 small{font-family:var(--f-body);font-weight:400;color:var(--muted);font-size:11px;letter-spacing:0}
 .cheat table{width:100%;table-layout:fixed;border-collapse:collapse;font-variant-numeric:tabular-nums}
@@ -457,8 +457,8 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
         <div class="effbar"><button class="btn ghost small" id="effMe">啟動效果</button><button class="btn ghost small" id="effFoe">獻祭效果</button></div>
       </div>
       <div class="effpanel" id="effPanel" hidden></div>
-      <div class="side foe" id="sideFoe"></div>
       <div class="rcol">
+      <div class="side foe" id="sideFoe"></div>
       <div class="turnbox">
         <div class="turnno" id="turnNo">回合 1</div>
         <div class="phase" id="phase">準備</div>
@@ -475,8 +475,8 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
       </div>
       <div class="cheat" id="cheat"></div>
       <div class="pilebar"><button class="btn ghost small" id="pileMe">查看我方棄牌</button><button class="btn ghost small" id="pileFoe">查看對手棄牌</button></div>
-      </div>
       <div class="side me" id="sideMe"></div>
+      </div>
       <div class="powers" id="powers"></div>
       <div class="banner" id="banner" hidden><div id="bannerText"></div></div>
       <div class="actbar" id="actbar"></div>
@@ -546,10 +546,10 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
   </section>
 </div>
 
-<script src="../shared/data.js?v=1102j"></script>
-<script src="../shared/decks.js?v=1102j"></script>
-<script src="../shared/cloud.js?v=1102j"></script>
-<script src="engine.js?v=1102j"></script>
-<script src="ui.js?v=1102j"></script>
+<script src="../shared/data.js?v=1103a"></script>
+<script src="../shared/decks.js?v=1103a"></script>
+<script src="../shared/cloud.js?v=1103a"></script>
+<script src="engine.js?v=1103a"></script>
+<script src="ui.js?v=1103a"></script>
 
 </html>
