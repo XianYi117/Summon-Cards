@@ -35,7 +35,22 @@
 
   // ---------- 畫面切換 ----------
   const screens = ['home', 'pick', 'vs', 'battle', 'rules', 'gallery', 'online', 'watchScr'];
-  function show(id) { screens.forEach(s => $('#' + s).hidden = s !== id); if (id === 'battle') fitStage(); }
+  function show(id) { screens.forEach(s => $('#' + s).hidden = s !== id); document.body.classList.toggle('need-land', ['battle', 'vs', 'watchScr'].includes(id)); if (id === 'battle') fitStage(); }
+  // 手機：全螢幕＋鎖定橫向（Android 可用；iPhone 不支援網頁全螢幕，改用「加入主畫面」）
+  (function fullscreen() {
+    const de = document.documentElement, standalone = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone;
+    const can = !!(de.requestFullscreen || de.webkitRequestFullscreen) && !standalone;
+    document.querySelectorAll('[data-fs]').forEach(b => {
+      b.classList.toggle('can', can);
+      b.onclick = async () => {
+        try {
+          if (document.fullscreenElement) { await document.exitFullscreen(); return; }
+          await (de.requestFullscreen ? de.requestFullscreen({ navigationUI: 'hide' }) : de.webkitRequestFullscreen());
+          if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape').catch(() => { });
+        } catch { }
+      };
+    });
+  })();
   document.querySelectorAll('[data-home]').forEach(b => b.onclick = () => show('home'));
 
   // ---------- 首頁 ----------
@@ -345,12 +360,33 @@
   // 懸停說明
   let tipTimer = null, focusOff = null, ovShow = null, ovHide = null;
   // 彈窗中的卡：停 0.15 秒顯示詳細資訊，移開 0.5 秒後收起
+  // 觸控裝置：長按卡片看大圖（放開後不會觸發點選）
+  function zoomCard(id, extra) {
+    const z = $('#zoomCard'), d = info(id); if (!z || !d) return;
+    $('#tip').hidden = true;
+    const txt = id[0] === 'L' ? `<h3>${id} ${d.name}</h3><div><b>${d.skill}</b>${d.text}</div>` : `<h3>${id} ${d.name}</h3><small>${COLOR_NAME[d.color]}屬性${d.race ? '．' + d.race : ''}</small><div><b>啟動</b>${d.act}</div><div><b>獻祭</b>${d.sac}</div>`;
+    z.innerHTML = `<img src="${img(id, true)}" alt="${id}"><div class="zt">${txt}${extra ? `<div>${extra}</div>` : ''}<small>點一下關閉</small></div>`;
+    // 放開手指時的那一下點擊會落在大圖上，先忽略一小段時間，免得一打開就關掉
+    const t0 = Date.now(); z.hidden = false; z.onclick = () => { if (Date.now() - t0 > 400) z.hidden = true; };
+  }
+  function longPress(c, id, extra) {
+    let t = 0, x = 0, y = 0;
+    const clear = () => { clearTimeout(t); t = 0; };
+    c.addEventListener('pointerdown', e => { c._lp = false; if (e.pointerType !== 'touch') return; x = e.clientX; y = e.clientY; clear(); t = setTimeout(() => { t = 0; c._lp = true; zoomCard(id, extra); }, 450); });
+    c.addEventListener('pointermove', e => { if (t && Math.hypot(e.clientX - x, e.clientY - y) > 10) clear(); });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(k => c.addEventListener(k, clear));
+    c.addEventListener('click', e => { if (c._lp) { c._lp = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+    c.addEventListener('contextmenu', e => e.preventDefault());
+  }
   function hoverOver(e, id) {
-    e.addEventListener('pointerenter', () => { clearTimeout(ovHide); clearTimeout(ovShow); ovShow = setTimeout(() => detailOver(id), 150); });
+    longPress(e, id);
+    e.addEventListener('pointerenter', ev => { if (ev.pointerType === 'touch') return; clearTimeout(ovHide); clearTimeout(ovShow); ovShow = setTimeout(() => detailOver(id), 150); });
     e.addEventListener('pointerleave', () => { clearTimeout(ovShow); clearTimeout(ovHide); ovHide = setTimeout(() => detailOver(null), 500); });
   }
   function bindHover(c, id, extra) {
+    longPress(c, id, extra);
     c.addEventListener('pointerenter', e => {
+      if (e.pointerType === 'touch') return;
       const t = $('#tip'); const d = info(id); if (!d) return;
       t.innerHTML = id[0] === 'L' ? `<b>${d.name}</b>．${d.skill}<br>${d.text}${extra || ''}` : `<b>${d.name}</b>（${COLOR_NAME[d.color]}）<br><b>啟動</b> ${d.act}<br><b>獻祭</b> ${d.sac}${extra || ''}`;
       const r = relRect(c); t.hidden = false;

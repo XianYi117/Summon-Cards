@@ -1,0 +1,15 @@
+{
+  "name": "召喚 測試版",
+  "short_name": "召喚β",
+  "description": "火、水、草三屬性牌型對戰卡牌遊戲",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#07090d",
+  "theme_color": "#07090d",
+  "icons": [
+    { "src": "../shared/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../shared/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

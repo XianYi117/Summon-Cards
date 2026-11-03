@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="召喚 vj.1102 雙人卡牌對戰網頁遊戲">
 <title>【測試版】召喚 SUMMON</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#07090d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="召喚β">
+<link rel="apple-touch-icon" href="../shared/icons/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;900&display=swap">
@@ -357,6 +364,46 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
   .info{position:static}
   .leader-grid{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px}
 }
+/* ===== 手機（方案 1：橫向優先）===== */
+/* 直拿時的「請轉橫向」提示：只在觸控裝置、對戰相關畫面出現 */
+.rotate{display:none}
+@media (orientation:portrait) and (pointer:coarse){
+  body.need-land .rotate{display:flex;position:fixed;inset:0;z-index:900;background:#07090df2;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:24px}
+}
+.rotate .ph{width:64px;height:104px;border:3px solid var(--gold-hi);border-radius:12px;position:relative;animation:rot 2.2s ease-in-out infinite}
+.rotate .ph::after{content:'';position:absolute;left:50%;bottom:6px;width:14px;height:3px;margin-left:-7px;border-radius:2px;background:var(--gold-hi)}
+@keyframes rot{0%,25%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
+.rotate b{font-family:var(--f-display);font-size:22px;color:var(--gold-hi);letter-spacing:.1em}
+.rotate p{margin:0;color:var(--muted);font-size:14px;line-height:1.7}
+.fsbtn{display:none}
+@media (pointer:coarse){ .fsbtn.can{display:inline-flex} }
+/* 長按卡片看大圖（觸控裝置） */
+.zoomov{position:fixed;inset:0;z-index:950;background:#05070bf0;display:flex;align-items:center;justify-content:center;gap:22px;padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.zoomov[hidden]{display:none}
+.zoomov img{height:min(86vh,560px);max-width:46vw;object-fit:contain;border-radius:4%;box-shadow:0 20px 50px #000}
+.zoomov .zt{max-width:min(46vw,420px);display:grid;gap:10px;font-size:16px;line-height:1.6}
+.zoomov .zt h3{margin:0;font-family:var(--f-display);color:var(--gold-hi);font-size:22px}
+.zoomov .zt b{color:var(--gold-hi);margin-right:6px}
+.zoomov .zt small{color:var(--muted)}
+@media (orientation:portrait){ .zoomov{flex-direction:column} .zoomov img{height:auto;width:min(78vw,340px);max-width:none} .zoomov .zt{max-width:86vw} }
+.card img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+@media (pointer:coarse){
+  .hand .card{--w:132px}
+  .hand{bottom:-24px}
+}
+/* 橫拿手機這類矮螢幕：選角、對戰前畫面縮小排版，按鈕不會跑出畫面 */
+@media (max-height:520px){
+  .screen{padding-block:10px}
+  .page{gap:10px}
+  .page-head h2{font-size:20px}
+  .leader-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px}
+  .info{padding:12px;gap:10px}
+  .vs-wrap{grid-template-columns:1fr auto 1fr;align-items:center;column-gap:24px;row-gap:6px;padding:8px 16px}
+  .vs-side.foe{grid-column:1;grid-row:1}.vs-mark{grid-column:2;grid-row:1;font-size:34px}.vs-side.me{grid-column:3;grid-row:1}
+  .vs-wrap>.mrow,.vs-wrap>.vs-hint{grid-column:1/-1;margin-top:4px!important}
+  .vs-side .card,.vs-side.foe .card{--w:min(120px,28vh);transform:none}
+  .vs-side .nm{font-size:16px}
+}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 .dtier{font-size:12px;color:var(--gold-hi);letter-spacing:.1em;margin-top:6px}.chips.decks .chip{min-width:120px}
 /* 牌組：右欄摘要＋選擇視窗 */
@@ -390,6 +437,8 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 
 <div id="app">
   <!-- 首頁 -->
+  <div class="rotate" id="rotateTip"><div class="ph"></div><b>請把手機轉成橫向</b><p>對戰畫面是橫的，轉過來會清楚很多。<br>加入主畫面後開啟，可以全螢幕遊玩。</p><button class="btn fsbtn" data-fs>全螢幕</button></div>
+<div class="zoomov" id="zoomCard" hidden></div>
   <section class="screen" id="home">
     <div class="home-wrap">
       <div class="home-fan" id="homeFan"></div>
@@ -404,6 +453,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
         <button class="btn" id="btnWatch">觀戰戰局</button>
         <button class="btn" id="btnRules">規則說明</button>
         <button class="btn" id="btnGallery">圖鑑一覽</button>
+        <button class="btn fsbtn" data-fs>全螢幕（手機）</button>
         <button class="btn" id="btnBuilder" onclick="location.href=SHARED_BASE+'../builder/'">卡牌構築．列印</button>
       </div>
       <div class="ver">測試版 vj.1102．隊長 13 位．角色卡 90 種</div>
@@ -546,10 +596,10 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
   </section>
 </div>
 
-<script src="../shared/data.js?v=1103a"></script>
-<script src="../shared/decks.js?v=1103a"></script>
-<script src="../shared/cloud.js?v=1103a"></script>
-<script src="engine.js?v=1103a"></script>
-<script src="ui.js?v=1103a"></script>
+<script src="../shared/data.js?v=1103b"></script>
+<script src="../shared/decks.js?v=1103b"></script>
+<script src="../shared/cloud.js?v=1103b"></script>
+<script src="engine.js?v=1103b"></script>
+<script src="ui.js?v=1103b"></script>
 
 </html>
