@@ -28,6 +28,7 @@
 }
 [hidden]{display:none!important}
 html,body{height:100%;margin:0;overflow:hidden}
+html{-webkit-tap-highlight-color:transparent}
 body{background:var(--ink);color:var(--text);font-family:var(--f-body);font-size:15px;overflow:hidden}
 button{font-family:inherit;cursor:pointer}
 button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);outline-offset:2px}
@@ -37,7 +38,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 
 /* 共用按鈕 */
 .btn{border:1px solid var(--gold);background:linear-gradient(#2b2a2a,#1a1918);color:var(--gold-hi);font-weight:700;letter-spacing:.12em;padding:11px 26px;border-radius:4px;font-size:15px;transition:transform .15s,box-shadow .15s,filter .15s}
-.btn:hover:not(:disabled){box-shadow:0 0 0 1px var(--gold-hi),0 0 18px #c9a45c55;transform:translateY(-1px)}
+@media (hover:hover){.btn:hover:not(:disabled){box-shadow:0 0 0 1px var(--gold-hi),0 0 18px #c9a45c55;transform:translateY(-1px)}}
 .btn:disabled{opacity:.35;cursor:default}
 .btn.primary{background:linear-gradient(#d8b46a,#9c7a39);color:#1b1408;border-color:var(--gold-hi)}
 .btn.ghost{background:transparent;border-color:var(--line);color:var(--text);letter-spacing:.06em}
@@ -85,7 +86,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .pick-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}
 .leader-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:14px;padding:6px}
 .leader-grid .card{--w:100%;cursor:pointer;transition:transform .25s,filter .25s,opacity .25s;border-radius:6%}
-.leader-grid .card:hover{transform:translateY(-4px)}
+@media (hover:hover){.leader-grid .card:hover{transform:translateY(-4px)}}
 .leader-grid.has-pick .card:not(.chosen){opacity:.32;filter:grayscale(.7)}
 .leader-grid .card.chosen{transform:scale(1.12);z-index:2;box-shadow:0 0 0 2px var(--gold-hi),0 0 26px #f1d49188;border-radius:6%}
 .info{position:sticky;top:0;display:grid;gap:14px;background:linear-gradient(#1c222c,#151a22);border:1px solid var(--line);border-radius:8px;padding:18px}
@@ -133,7 +134,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 /* 圖鑑 */
 .gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:16px}
 .gal-grid .card{--w:100%;cursor:pointer;transition:transform .2s;border-radius:6%}
-.gal-grid .card:hover{transform:translateY(-5px) scale(1.03)}
+@media (hover:hover){.gal-grid .card:hover{transform:translateY(-5px) scale(1.03)}}
 
 /* ===== 對戰舞台 ===== */
 #battle{background:#07090d}
@@ -204,7 +205,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .hand{position:absolute;left:260px;right:250px;bottom:-34px;height:190px;display:flex;justify-content:center;align-items:flex-end}
 .hand .card{--w:118px;margin:0 -10px;transition:transform .18s,margin .18s;cursor:pointer;transform:translateY(var(--ty,0)) rotate(var(--rot,0deg))}
 .hand .card .inner{transition:transform .12s}
-.hand .card:hover{z-index:5;--ty:-36px;--rot:0deg}
+@media (hover:hover){.hand .card:hover{z-index:5;--ty:-36px;--rot:0deg}}
 .hand .card.sel{--ty:-58px;--rot:0deg;z-index:4}
 .hand .card.sel .face{box-shadow:0 0 0 3px var(--gold-hi),0 0 24px #f1d491aa}
 .hand .card .ord{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--gold-hi);color:#1b1408;font-weight:900;border-radius:50%;width:24px;height:24px;display:grid;place-items:center;font-size:13px;z-index:3}
@@ -219,7 +220,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .dslot{position:relative;height:420px;flex:none}
 .detail{position:absolute;left:0;top:0;z-index:40;width:222px;box-sizing:border-box;display:grid;gap:8px;background:#11151cf5;border:1px solid var(--gold);border-radius:10px;padding:12px 14px;box-shadow:0 0 0 1px var(--gold-hi),0 12px 40px #000c,0 0 26px #f1d49144;visibility:hidden;opacity:0;transition:opacity .12s}
 .detail.show{visibility:visible;opacity:1}
-.mcards .card:hover{outline:2px solid var(--gold-hi);outline-offset:2px;border-radius:6%}
+@media (hover:hover){.mcards .card:hover{outline:2px solid var(--gold-hi);outline-offset:2px;border-radius:6%}}
 .detail.over{z-index:105;box-shadow:0 0 0 1px var(--gold-hi),0 0 30px #f1d49166}
 .detail.focus{}
 .detail .card{--w:140px;justify-self:center}
@@ -342,7 +343,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
 .mbox p{margin:0;color:var(--muted)}
 .mcards{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
 .mcards .card{--w:110px;cursor:pointer;border-radius:6%;transition:transform .15s}
-.mcards .card:hover{transform:translateY(-4px)}
+@media (hover:hover){.mcards .card:hover{transform:translateY(-4px)}}
 .mcards .card.sel{box-shadow:0 0 0 3px var(--gold-hi),0 0 20px #f1d491aa}
 .mrow{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .colorbtn{width:54px;height:54px;border-radius:50%;border:2px solid #000;font-family:var(--f-display);font-weight:900;font-size:22px;color:#fff}
@@ -596,10 +597,10 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold-hi);o
   </section>
 </div>
 
-<script src="../shared/data.js?v=1103b"></script>
-<script src="../shared/decks.js?v=1103b"></script>
-<script src="../shared/cloud.js?v=1103b"></script>
-<script src="engine.js?v=1103b"></script>
-<script src="ui.js?v=1103b"></script>
+<script src="../shared/data.js?v=1103c"></script>
+<script src="../shared/decks.js?v=1103c"></script>
+<script src="../shared/cloud.js?v=1103c"></script>
+<script src="engine.js?v=1103c"></script>
+<script src="ui.js?v=1103c"></script>
 
 </html>

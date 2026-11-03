@@ -152,7 +152,7 @@ function randomDeckIds(rand = Math.random) {
 // 卡圖放在 shared/cards/（原圖 600px）與 shared/cards/sm/（小圖 300px）。
 // 路徑以這支 data.js 的位置為準，所以 beta/、builder/ 或之後新增的頁面都能共用同一份卡圖。
 const SHARED_BASE = (document.currentScript && document.currentScript.src || location.href).replace(/[^/]*$/, '');
-const IMG_VER = '1103b'; // 換卡圖時改這個，瀏覽器和快取就會抓新圖
+const IMG_VER = '1103c'; // 換卡圖時改這個，瀏覽器和快取就會抓新圖
 const img = (id, hi) => hi ? `${SHARED_BASE}cards/${id}.webp?v=${IMG_VER}` : `${SHARED_BASE}cards/sm/${id}.webp?v=${IMG_VER}`;
 // 只預載「這一場用得到」的卡（雙方牌組＋隊長），卡池再大，載入量也不會跟著變大
 const IMG_CACHE = new Map();

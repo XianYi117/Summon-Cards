@@ -13,7 +13,7 @@
     if (id) c.dataset.id = id;
     if (o.uid) c.dataset.uid = o.uid;
     const nm = id && info(id) ? info(id).name : '卡背';
-    c.innerHTML = `<div class="inner"><div class="face">${id ? `<img src="${img(id, o.hi)}" alt="${id} ${nm}" decoding="async"${o.lazy ? ' loading="lazy"' : ''}>` : ''}</div><div class="back"></div></div><div class="shade"></div><div class="glare"></div>`;
+    c.innerHTML = `<div class="inner"><div class="face">${id ? `<img src="${img(id, o.hi)}" alt="${id} ${nm}"${o.lazy ? ' loading="lazy" decoding="async"' : ''}>` : ''}</div><div class="back"></div></div><div class="shade"></div><div class="glare"></div>`;
     return c;
   }
   // 滑鼠懸停時卡片傾斜＋高亮；用 requestAnimationFrame 節流（每個畫面最多算一次），觸控裝置不啟用
