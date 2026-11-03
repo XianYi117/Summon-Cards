@@ -9,7 +9,7 @@ import os, sys, tempfile
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(REPO, 'docs', '召喚_遊戲規則.pdf')
 SP = tempfile.mkdtemp() + '/'
-VER = 'vj.1102'
+VER = 'v.j1.0.5'
 E = lambda x: html.escape(str(x))
 data = open(os.path.join(REPO, 'shared', 'data.js'), encoding='utf8').read()
 NCARDS = len(re.findall(r'^  [FWG]\d\d: \{', data, re.M))
